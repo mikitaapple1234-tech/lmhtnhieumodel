@@ -31,6 +31,7 @@ function uid() {
 function LolDictionary() {
   const [entries, setEntries] = useState([]);
   const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("");
   const [looking, setLooking] = useState(false);
@@ -61,7 +62,9 @@ function LolDictionary() {
     setEntries(next);
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch (e) {}
+    } catch (e) {
+      setLoadError(true);
+    }
   }
 
   function showToast(msg) {
@@ -102,9 +105,9 @@ function LolDictionary() {
       }
       persist(next);
       setQuery("");
-      showToast(existingIdx >= 0 ? "Đã cập nhật lại từ" : "Đã lưu vào từ điển");
+      showToast(existingIdx >= 0 ? "Đã cập nhật lại từ đã có" : "Đã lưu vào từ điển");
     } catch (e) {
-      setLookupError(e.message || "Lỗi kết nối hệ thống.");
+      setLookupError(e.message || "Không tra cứu được từ này. Thử lại nhé.");
     } finally {
       setLooking(false);
     }
@@ -175,10 +178,10 @@ function LolDictionary() {
       <div style={styles.bgRunes} />
       <header style={styles.header}>
         <div style={styles.brandRow}>
-          <span style={{ fontSize: 22 }}>⚔️</span>
+          <span style={{ fontSize: 20 }}>⚔️</span>
           <h1 style={styles.title}>Rune Lexicon</h1>
         </div>
-        <p style={styles.subtitle}>Từ điển Hán ngữ · Thuật ngữ Liên Minh Huyền Thoại (Gemini 3)</p>
+        <p style={styles.subtitle}>Từ điển Hán ngữ · thuật ngữ Liên Minh Huyền Thoại</p>
       </header>
 
       <section style={styles.searchCard}>
@@ -195,7 +198,7 @@ function LolDictionary() {
             disabled={looking || !query.trim()}
             style={{ ...styles.searchBtn, opacity: looking || !query.trim() ? 0.5 : 1 }}
           >
-            {looking ? "Đang tra cứu..." : "Tra cứu"}
+            {looking ? "Đang tra…" : "Tra cứu"}
           </button>
         </div>
         {lookupError && <div style={styles.errorRow}>⚠ <span style={{ color: "#E84057", fontSize: 13 }}>{lookupError}</span></div>}
@@ -209,7 +212,7 @@ function LolDictionary() {
           <input
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            placeholder="Lọc từ điển..."
+            placeholder="Lọc trong từ điển…"
             style={styles.filterInput}
           />
           <button style={styles.addBtn} onClick={() => setManualOpen((o) => !o)}>+ Thêm từ</button>
@@ -222,8 +225,8 @@ function LolDictionary() {
             <input placeholder="Từ (chữ Hán)" value={manualDraft.word} onChange={(e) => setManualDraft({ ...manualDraft, word: e.target.value })} style={styles.manualInput} />
             <input placeholder="Pinyin" value={manualDraft.pinyin} onChange={(e) => setManualDraft({ ...manualDraft, pinyin: e.target.value })} style={styles.manualInput} />
           </div>
-          <input placeholder="Nghĩa tiếng Việt" value={manualDraft.meaning} onChange={(e) => setManualDraft({ ...manualDraft, meaning: e.target.value })} style={{ ...styles.manualInput, width: "100%", marginTop: 8 }} />
-          <textarea placeholder="Ghi chú thêm" value={manualDraft.note} onChange={(e) => setManualDraft({ ...manualDraft, note: e.target.value })} style={{ ...styles.manualInput, width: "100%", marginTop: 8, minHeight: 60, resize: "vertical" }} />
+          <input placeholder="Nghĩa" value={manualDraft.meaning} onChange={(e) => setManualDraft({ ...manualDraft, meaning: e.target.value })} style={{ ...styles.manualInput, width: "100%", marginTop: 8 }} />
+          <textarea placeholder="Ghi chú (không bắt buộc)" value={manualDraft.note} onChange={(e) => setManualDraft({ ...manualDraft, note: e.target.value })} style={{ ...styles.manualInput, width: "100%", marginTop: 8, minHeight: 60, resize: "vertical" }} />
           <select value={manualDraft.category} onChange={(e) => setManualDraft({ ...manualDraft, category: e.target.value })} style={{ ...styles.manualInput, width: "100%", marginTop: 8 }}>
             {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
@@ -235,12 +238,14 @@ function LolDictionary() {
       )}
 
       <main style={styles.list}>
-        {!loaded && <div style={styles.emptyState}>Đang tải dữ liệu từ điển...</div>}
+        {!loaded && <div style={styles.emptyState}>Đang tải từ điển…</div>}
         {loaded && entries.length === 0 && (
-          <div style={styles.emptyState}>Từ điển đang trống. Hãy tra thử từ <span style={{ color: "#C89B3C" }}>打野</span> để bắt đầu.</div>
+          <div style={styles.emptyState}>
+            Chưa có từ nào. Tra một thuật ngữ LMHT như <span style={{ color: "#C89B3C" }}>打野</span> (đi rừng) để bắt đầu.
+          </div>
         )}
         {loaded && entries.length > 0 && filtered.length === 0 && (
-          <div style={styles.emptyState}>Không tìm thấy từ phù hợp.</div>
+          <div style={styles.emptyState}>Không tìm thấy từ phù hợp với bộ lọc.</div>
         )}
         {grouped.map(({ category, items }) => {
           const isClosed = !!closedFolders[category];
@@ -302,6 +307,7 @@ function LolDictionary() {
       </main>
 
       {toast && <div style={styles.toast}>{toast}</div>}
+      {loadError && <div style={styles.toastError}>Có sự cố khi lưu — dữ liệu có thể chưa được cập nhật.</div>}
     </div>
   );
 }
@@ -312,23 +318,23 @@ const styles = {
   header: { maxWidth: 640, margin: "0 auto 22px", textAlign: "center", position: "relative" },
   brandRow: { display: "flex", alignItems: "center", justifyContent: "center", gap: 8 },
   title: { fontSize: 26, fontWeight: 700, letterSpacing: 1, margin: 0, color: "#F0E6D2", textShadow: "0 0 18px rgba(200,155,60,0.25)" },
-  subtitle: { fontFamily: "Arial, sans-serif", fontSize: 12, color: "#8C9AA6", marginTop: 6, letterSpacing: 0.3 },
+  subtitle: { fontFamily: "Arial, sans-serif", fontSize: 12.5, color: "#8C9AA6", marginTop: 6, letterSpacing: 0.4 },
   searchCard: { maxWidth: 640, margin: "0 auto 18px", background: "rgba(20,32,54,0.75)", border: "1px solid #3A4A5C", borderRadius: 4, padding: 12 },
   searchRow: { display: "flex", gap: 8 },
   searchInput: { flex: 1, background: "#0F1B2E", border: "1px solid #3A4A5C", borderRadius: 3, padding: "11px 12px", color: "#F0E6D2", fontSize: 15, fontFamily: "inherit", outline: "none" },
-  searchBtn: { display: "flex", alignItems: "center", gap: 6, background: "linear-gradient(180deg, #C89B3C, #A9791F)", color: "#0A1428", border: "none", borderRadius: 3, padding: "0 16px", fontWeight: 700, fontSize: 13.5, fontFamily: "Arial, sans-serif", cursor: "pointer" },
+  searchBtn: { display: "flex", alignItems: "center", gap: 6, background: "linear-gradient(180deg, #C89B3C, #A9791F)", color: "#0A1428", border: "none", borderRadius: 3, padding: "0 16px", fontWeight: 700, fontSize: 13.5, fontFamily: "Arial, sans-serif" },
   errorRow: { display: "flex", alignItems: "center", gap: 6, marginTop: 8 },
   listHeader: { maxWidth: 640, margin: "0 auto 10px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 },
   listHeaderLeft: { display: "flex", alignItems: "center", gap: 6 },
   listCount: { fontFamily: "Arial, sans-serif", fontSize: 12.5, color: "#8C9AA6", letterSpacing: 0.3 },
   filterRow: { display: "flex", gap: 8 },
   filterInput: { background: "#0F1B2E", border: "1px solid #3A4A5C", borderRadius: 3, padding: "7px 10px", color: "#F0E6D2", fontSize: 13, fontFamily: "inherit", outline: "none", width: 160 },
-  addBtn: { display: "flex", alignItems: "center", gap: 5, background: "transparent", border: "1px solid #0AC8B9", color: "#0AC8B9", borderRadius: 3, padding: "7px 12px", fontSize: 12.5, fontFamily: "Arial, sans-serif", fontWeight: 600, cursor: "pointer" },
+  addBtn: { display: "flex", alignItems: "center", gap: 5, background: "transparent", border: "1px solid #0AC8B9", color: "#0AC8B9", borderRadius: 3, padding: "7px 12px", fontSize: 12.5, fontFamily: "Arial, sans-serif", fontWeight: 600 },
   manualCard: { maxWidth: 640, margin: "0 auto 16px", background: "rgba(20,32,54,0.75)", border: "1px solid #0AC8B9", borderRadius: 4, padding: 14 },
   manualGrid: { display: "flex", gap: 8 },
   manualInput: { flex: 1, background: "#0F1B2E", border: "1px solid #3A4A5C", borderRadius: 3, padding: "9px 10px", color: "#F0E6D2", fontSize: 13.5, fontFamily: "inherit", outline: "none" },
-  saveBtn: { display: "flex", alignItems: "center", gap: 5, background: "#0AC8B9", color: "#0A1428", border: "none", borderRadius: 3, padding: "7px 14px", fontWeight: 700, fontSize: 12.5, fontFamily: "Arial, sans-serif", cursor: "pointer" },
-  cancelBtn: { display: "flex", alignItems: "center", gap: 5, background: "transparent", color: "#8C9AA6", border: "1px solid #3A4A5C", borderRadius: 3, padding: "7px 14px", fontSize: 12.5, fontFamily: "Arial, sans-serif", cursor: "pointer" },
+  saveBtn: { display: "flex", alignItems: "center", gap: 5, background: "#0AC8B9", color: "#0A1428", border: "none", borderRadius: 3, padding: "7px 14px", fontWeight: 700, fontSize: 12.5, fontFamily: "Arial, sans-serif" },
+  cancelBtn: { display: "flex", alignItems: "center", gap: 5, background: "transparent", color: "#8C9AA6", border: "1px solid #3A4A5C", borderRadius: 3, padding: "7px 14px", fontSize: 12.5, fontFamily: "Arial, sans-serif" },
   list: { maxWidth: 640, margin: "0 auto", display: "flex", flexDirection: "column", gap: 14 },
   folder: { border: "1px solid #2A3A4C", borderRadius: 4, overflow: "hidden" },
   folderHeader: { display: "flex", alignItems: "center", gap: 8, background: "rgba(200,155,60,0.08)", padding: "10px 12px", cursor: "pointer", userSelect: "none" },
@@ -348,6 +354,7 @@ const styles = {
   iconBtnGood: { background: "#0AC8B9", border: "none", color: "#0A1428", borderRadius: 3, padding: "6px 9px", cursor: "pointer" },
   iconBtnBad: { background: "transparent", border: "1px solid #5C2A2A", color: "#E84057", borderRadius: 3, padding: "6px 9px", cursor: "pointer" },
   toast: { position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)", background: "#0AC8B9", color: "#0A1428", padding: "9px 18px", borderRadius: 4, fontSize: 13, fontWeight: 600, fontFamily: "Arial, sans-serif", boxShadow: "0 4px 20px rgba(0,0,0,0.4)" },
+  toastError: { position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)", background: "#E84057", color: "#0A1428", padding: "9px 18px", borderRadius: 4, fontSize: 13, fontWeight: 600, fontFamily: "Arial, sans-serif" },
 };
 
 ReactDOM.createRoot(document.getElementById("root")).render(<LolDictionary />);
