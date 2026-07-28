@@ -1,0 +1,364 @@
+HTML
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Rune Lexicon</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body style="margin:0;">
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect } = React;
+
+const STORAGE_KEY = "lol-hanzi-entries";
+const CATEGORIES = [
+  "Tên tướng",
+  "Kỹ năng / Chiêu thức",
+  "Vai trò / Lối chơi",
+  "Trang bị / Vật phẩm",
+  "Thuật ngữ trận đấu",
+  "Từ vựng chung",
+];
+
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+function LolDictionary() {
+  const [entries, setEntries] = useState([]);
+  const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("");
+  const [looking, setLooking] = useState(false);
+  const [lookupError, setLookupError] = useState("");
+  const [editingId, setEditingId] = useState(null);
+  const [editDraft, setEditDraft] = useState({ pinyin: "", meaning: "", note: "", category: CATEGORIES[CATEGORIES.length - 1] });
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualDraft, setManualDraft] = useState({ word: "", pinyin: "", meaning: "", note: "", category: CATEGORIES[CATEGORIES.length - 1] });
+  const [toast, setToast] = useState("");
+  const [closedFolders, setClosedFolders] = useState({});
+
+  function toggleFolder(cat) {
+    setClosedFolders((prev) => ({ ...prev, [cat]: !prev[cat] }));
+  }
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        setEntries(parsed.map((e) => ({ ...e, category: e.category || "Từ vựng chung" })));
+      }
+    } catch (e) {}
+    setLoaded(true);
+  }, []);
+
+  function persist(next) {
+    setEntries(next);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    } catch (e) {
+      setLoadError(true);
+    }
+  }
+
+  function showToast(msg) {
+    setToast(msg);
+    setTimeout(() => setToast(""), 2200);
+  }
+
+  async function handleLookup() {
+    const word = query.trim();
+    if (!word) return;
+    setLookupError("");
+    setLooking(true);
+    try {
+      const response = await fetch("/api/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ word }),
+      });
+      const parsed = await response.json();
+      if (!response.ok) throw new Error(parsed.error || parsed.detail || "API lỗi");
+
+      const existingIdx = entries.findIndex((e) => e.word === word);
+      const newEntry = {
+        id: existingIdx >= 0 ? entries[existingIdx].id : uid(),
+        word,
+        pinyin: parsed.pinyin || "",
+        meaning: parsed.meaning || "",
+        note: parsed.note || "",
+        category: parsed.category || "Từ vựng chung",
+        createdAt: existingIdx >= 0 ? entries[existingIdx].createdAt : Date.now(),
+      };
+      let next;
+      if (existingIdx >= 0) {
+        next = [...entries];
+        next[existingIdx] = newEntry;
+      } else {
+        next = [newEntry, ...entries];
+      }
+      persist(next);
+      setQuery("");
+      showToast(existingIdx >= 0 ? "Đã cập nhật lại từ đã có" : "Đã lưu vào từ điển");
+    } catch (e) {
+      setLookupError(e.message || "Hệ thống đang quá tải. Đang tự động thử lại...");
+    } finally {
+      setLooking(false);
+    }
+  }
+
+  function startEdit(entry) {
+    setEditingId(entry.id);
+    setEditDraft({ pinyin: entry.pinyin, meaning: entry.meaning, note: entry.note, category: entry.category || "Từ vựng chung" });
+  }
+
+  function saveEdit(id) {
+    const next = entries.map((e) => (e.id === id ? { ...e, ...editDraft } : e));
+    persist(next);
+    setEditingId(null);
+    showToast("Đã lưu chỉnh sửa");
+  }
+
+  function deleteEntry(id) {
+    const next = entries.filter((e) => e.id !== id);
+    persist(next);
+    showToast("Đã xoá từ");
+  }
+
+  function addManual() {
+    const word = manualDraft.word.trim();
+    if (!word) return;
+    const existingIdx = entries.findIndex((e) => e.word === word);
+    const entry = {
+      id: existingIdx >= 0 ? entries[existingIdx].id : uid(),
+      word,
+      pinyin: manualDraft.pinyin.trim(),
+      meaning: manualDraft.meaning.trim(),
+      note: manualDraft.note.trim(),
+      category: manualDraft.category || "Từ vựng chung",
+      createdAt: existingIdx >= 0 ? entries[existingIdx].createdAt : Date.now(),
+    };
+    let next;
+    if (existingIdx >= 0) {
+      next = [...entries];
+      next[existingIdx] = entry;
+    } else {
+      next = [entry, ...entries];
+    }
+    persist(next);
+    setManualDraft({ word: "", pinyin: "", meaning: "", note: "", category: CATEGORIES[CATEGORIES.length - 1] });
+    setManualOpen(false);
+    showToast("Đã thêm từ mới");
+  }
+
+  const filtered = entries.filter((e) => {
+    const q = filter.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      e.word.toLowerCase().includes(q) ||
+      e.pinyin.toLowerCase().includes(q) ||
+      e.meaning.toLowerCase().includes(q) ||
+      e.note.toLowerCase().includes(q)
+    );
+  });
+
+  const grouped = CATEGORIES.map((cat) => ({
+    category: cat,
+    items: filtered.filter((e) => (e.category || "Từ vựng chung") === cat),
+  })).filter((g) => g.items.length > 0);
+
+  return (
+    <div style={styles.page}>
+      <div style={styles.bgRunes} />
+      <header style={styles.header}>
+        <div style={styles.brandRow}>
+          <span style={{ fontSize: 22 }}>⚔️</span>
+          <h1 style={styles.title}>Rune Lexicon</h1>
+        </div>
+        <p style={styles.subtitle}>Từ điển Hán ngữ · Thuật ngữ Liên Minh Huyền Thoại (Multi-AI Fallback)</p>
+      </header>
+
+      <section style={styles.searchCard}>
+        <div style={styles.searchRow}>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") handleLookup(); }}
+            placeholder="Nhập từ tiếng Trung cần tra… ví dụ 打野"
+            style={styles.searchInput}
+          />
+          <button
+            onClick={handleLookup}
+            disabled={looking || !query.trim()}
+            style={{ ...styles.searchBtn, opacity: looking || !query.trim() ? 0.5 : 1 }}
+          >
+            {looking ? "Đang tra cứu..." : "Tra cứu"}
+          </button>
+        </div>
+        {lookupError && <div style={styles.errorRow}>⚠ <span style={{ color: "#E84057", fontSize: 13 }}>{lookupError}</span></div>}
+      </section>
+
+      <section style={styles.listHeader}>
+        <div style={styles.listHeaderLeft}>
+          <span style={styles.listCount}>📖 {entries.length} mục từ</span>
+        </div>
+        <div style={styles.filterRow}>
+          <input
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder="Lọc từ điển..."
+            style={styles.filterInput}
+          />
+          <button style={styles.addBtn} onClick={() => setManualOpen((o) => !o)}>+ Thêm từ</button>
+        </div>
+      </section>
+
+      {manualOpen && (
+        <section style={styles.manualCard}>
+          <div style={styles.manualGrid}>
+            <input placeholder="Từ (chữ Hán)" value={manualDraft.word} onChange={(e) => setManualDraft({ ...manualDraft, word: e.target.value })} style={styles.manualInput} />
+            <input placeholder="Pinyin" value={manualDraft.pinyin} onChange={(e) => setManualDraft({ ...manualDraft, pinyin: e.target.value })} style={styles.manualInput} />
+          </div>
+          <input placeholder="Nghĩa tiếng Việt" value={manualDraft.meaning} onChange={(e) => setManualDraft({ ...manualDraft, meaning: e.target.value })} style={{ ...styles.manualInput, width: "100%", marginTop: 8 }} />
+          <textarea placeholder="Ghi chú thêm (ví dụ trong game)" value={manualDraft.note} onChange={(e) => setManualDraft({ ...manualDraft, note: e.target.value })} style={{ ...styles.manualInput, width: "100%", marginTop: 8, minHeight: 60, resize: "vertical" }} />
+          <select value={manualDraft.category} onChange={(e) => setManualDraft({ ...manualDraft, category: e.target.value })} style={{ ...styles.manualInput, width: "100%", marginTop: 8 }}>
+            {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            <button style={styles.saveBtn} onClick={addManual} disabled={!manualDraft.word.trim()}>✓ Lưu</button>
+            <button style={styles.cancelBtn} onClick={() => setManualOpen(false)}>✕ Huỷ</button>
+          </div>
+        </section>
+      )}
+
+      <main style={styles.list}>
+        {!loaded && <div style={styles.emptyState}>Đang tải dữ liệu từ điển...</div>}
+        {loaded && entries.length === 0 && (
+          <div style={styles.emptyState}>
+            Từ điển đang trống. Hãy tra thử từ <span style={{ color: "#C89B3C" }}>打野</span> hoặc <span style={{ color: "#C89B3C" }}>大招</span> để bắt đầu.
+          </div>
+        )}
+        {loaded && entries.length > 0 && filtered.length === 0 && (
+          <div style={styles.emptyState}>Không tìm thấy từ phù hợp với từ khóa lọc.</div>
+        )}
+        {grouped.map(({ category, items }) => {
+          const isClosed = !!closedFolders[category];
+          return (
+            <div key={category} style={styles.folder}>
+              <div style={styles.folderHeader} onClick={() => toggleFolder(category)}>
+                <span style={styles.folderArrow}>{isClosed ? "▶" : "▼"}</span>
+                <span style={styles.folderName}>📁 {category}</span>
+                <span style={styles.folderCount}>{items.length}</span>
+              </div>
+              {!isClosed && (
+                <div style={styles.folderBody}>
+                  {items.map((entry) => (
+                    <div key={entry.id} style={styles.card}>
+                      <div style={styles.cardTop}>
+                        <div>
+                          <span style={styles.word}>{entry.word}</span>
+                          <span style={styles.pinyin}>
+                            {editingId === entry.id ? (
+                              <input value={editDraft.pinyin} onChange={(e) => setEditDraft({ ...editDraft, pinyin: e.target.value })} style={styles.inlineInput} />
+                            ) : entry.pinyin}
+                          </span>
+                        </div>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          {editingId === entry.id ? (
+                            <>
+                              <button style={styles.iconBtnGood} onClick={() => saveEdit(entry.id)}>✓</button>
+                              <button style={styles.iconBtn} onClick={() => setEditingId(null)}>✕</button>
+                            </>
+                          ) : (
+                            <>
+                              <button style={styles.iconBtn} onClick={() => startEdit(entry)}>✎</button>
+                              <button style={styles.iconBtnBad} onClick={() => deleteEntry(entry.id)}>🗑</button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      {editingId === entry.id ? (
+                        <>
+                          <input value={editDraft.meaning} onChange={(e) => setEditDraft({ ...editDraft, meaning: e.target.value })} style={{ ...styles.inlineInput, width: "100%", marginTop: 8, fontSize: 14 }} placeholder="Nghĩa" />
+                          <textarea value={editDraft.note} onChange={(e) => setEditDraft({ ...editDraft, note: e.target.value })} style={{ ...styles.inlineInput, width: "100%", marginTop: 6, minHeight: 50, resize: "vertical" }} placeholder="Ghi chú" />
+                          <select value={editDraft.category} onChange={(e) => setEditDraft({ ...editDraft, category: e.target.value })} style={{ ...styles.inlineInput, width: "100%", marginTop: 6 }}>
+                            {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                        </>
+                      ) : (
+                        <>
+                          <p style={styles.meaning}>{entry.meaning}</p>
+                          {entry.note && <p style={styles.note}>{entry.note}</p>}
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </main>
+
+      {toast && <div style={styles.toast}>{toast}</div>}
+      {loadError && <div style={styles.toastError}>Cảnh báo: Không thể lưu trữ cục bộ (LocalStorage).</div>}
+    </div>
+  );
+}
+
+const styles = {
+  page: { minHeight: "100vh", background: "linear-gradient(180deg, #0A1428 0%, #0F1B33 60%, #0A1428 100%)", color: "#F0E6D2", fontFamily: "Georgia, 'Noto Serif SC', serif", padding: "28px 16px 60px", position: "relative", overflow: "hidden" },
+  bgRunes: { position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle at 15% 20%, rgba(200,155,60,0.06) 0%, transparent 35%), radial-gradient(circle at 85% 80%, rgba(10,200,185,0.06) 0%, transparent 35%)", pointerEvents: "none" },
+  header: { maxWidth: 640, margin: "0 auto 22px", textAlign: "center", position: "relative" },
+  brandRow: { display: "flex", alignItems: "center", justifyContent: "center", gap: 8 },
+  title: { fontSize: 26, fontWeight: 700, letterSpacing: 1, margin: 0, color: "#F0E6D2", textShadow: "0 0 18px rgba(200,155,60,0.25)" },
+  subtitle: { fontFamily: "Arial, sans-serif", fontSize: 12, color: "#8C9AA6", marginTop: 6, letterSpacing: 0.3 },
+  searchCard: { maxWidth: 640, margin: "0 auto 18px", background: "rgba(20,32,54,0.75)", border: "1px solid #3A4A5C", borderRadius: 4, padding: 12 },
+  searchRow: { display: "flex", gap: 8 },
+  searchInput: { flex: 1, background: "#0F1B2E", border: "1px solid #3A4A5C", borderRadius: 3, padding: "11px 12px", color: "#F0E6D2", fontSize: 15, fontFamily: "inherit", outline: "none" },
+  searchBtn: { display: "flex", alignItems: "center", gap: 6, background: "linear-gradient(180deg, #C89B3C, #A9791F)", color: "#0A1428", border: "none", borderRadius: 3, padding: "0 16px", fontWeight: 700, fontSize: 13.5, fontFamily: "Arial, sans-serif", cursor: "pointer" },
+  errorRow: { display: "flex", alignItems: "center", gap: 6, marginTop: 8 },
+  listHeader: { maxWidth: 640, margin: "0 auto 10px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 },
+  listHeaderLeft: { display: "flex", alignItems: "center", gap: 6 },
+  listCount: { fontFamily: "Arial, sans-serif", fontSize: 12.5, color: "#8C9AA6", letterSpacing: 0.3 },
+  filterRow: { display: "flex", gap: 8 },
+  filterInput: { background: "#0F1B2E", border: "1px solid #3A4A5C", borderRadius: 3, padding: "7px 10px", color: "#F0E6D2", fontSize: 13, fontFamily: "inherit", outline: "none", width: 160 },
+  addBtn: { display: "flex", alignItems: "center", gap: 5, background: "transparent", border: "1px solid #0AC8B9", color: "#0AC8B9", borderRadius: 3, padding: "7px 12px", fontSize: 12.5, fontFamily: "Arial, sans-serif", fontWeight: 600, cursor: "pointer" },
+  manualCard: { maxWidth: 640, margin: "0 auto 16px", background: "rgba(20,32,54,0.75)", border: "1px solid #0AC8B9", borderRadius: 4, padding: 14 },
+  manualGrid: { display: "flex", gap: 8 },
+  manualInput: { flex: 1, background: "#0F1B2E", border: "1px solid #3A4A5C", borderRadius: 3, padding: "9px 10px", color: "#F0E6D2", fontSize: 13.5, fontFamily: "inherit", outline: "none" },
+  saveBtn: { display: "flex", alignItems: "center", gap: 5, background: "#0AC8B9", color: "#0A1428", border: "none", borderRadius: 3, padding: "7px 14px", fontWeight: 700, fontSize: 12.5, fontFamily: "Arial, sans-serif", cursor: "pointer" },
+  cancelBtn: { display: "flex", alignItems: "center", gap: 5, background: "transparent", color: "#8C9AA6", border: "1px solid #3A4A5C", borderRadius: 3, padding: "7px 14px", fontSize: 12.5, fontFamily: "Arial, sans-serif", cursor: "pointer" },
+  list: { maxWidth: 640, margin: "0 auto", display: "flex", flexDirection: "column", gap: 14 },
+  folder: { border: "1px solid #2A3A4C", borderRadius: 4, overflow: "hidden" },
+  folderHeader: { display: "flex", alignItems: "center", gap: 8, background: "rgba(200,155,60,0.08)", padding: "10px 12px", cursor: "pointer", userSelect: "none" },
+  folderArrow: { fontSize: 10, color: "#C89B3C" },
+  folderName: { fontSize: 14, fontWeight: 700, color: "#C89B3C", flex: 1, fontFamily: "Arial, sans-serif" },
+  folderCount: { fontSize: 11.5, color: "#8C9AA6", fontFamily: "Arial, sans-serif", background: "rgba(255,255,255,0.06)", padding: "2px 8px", borderRadius: 10 },
+  folderBody: { display: "flex", flexDirection: "column", gap: 8, padding: 10 },
+  emptyState: { textAlign: "center", color: "#6B7B8C", fontSize: 13.5, fontFamily: "Arial, sans-serif", padding: "30px 10px", border: "1px dashed #2A3A4C", borderRadius: 4 },
+  card: { background: "rgba(20,32,54,0.6)", border: "1px solid #2A3A4C", borderLeft: "3px solid #C89B3C", borderRadius: 3, padding: "13px 14px" },
+  cardTop: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" },
+  word: { fontSize: 20, fontWeight: 700, marginRight: 10, color: "#F0E6D2" },
+  pinyin: { fontSize: 13.5, color: "#0AC8B9", fontFamily: "Arial, sans-serif" },
+  meaning: { margin: "6px 0 2px", fontSize: 14.5, color: "#E5DBC4", lineHeight: 1.5 },
+  note: { margin: "4px 0 0", fontSize: 12.5, color: "#8C9AA6", fontFamily: "Arial, sans-serif", lineHeight: 1.4, fontStyle: "italic" },
+  inlineInput: { background: "#0F1B2E", border: "1px solid #3A4A5C", borderRadius: 3, padding: "5px 8px", color: "#F0E6D2", fontSize: 13, fontFamily: "inherit", outline: "none" },
+  iconBtn: { background: "transparent", border: "1px solid #3A4A5C", color: "#8C9AA6", borderRadius: 3, padding: "6px 9px", cursor: "pointer" },
+  iconBtnGood: { background: "#0AC8B9", border: "none", color: "#0A1428", borderRadius: 3, padding: "6px 9px", cursor: "pointer" },
+  iconBtnBad: { background: "transparent", border: "1px solid #5C2A2A", color: "#E84057", borderRadius: 3, padding: "6px 9px", cursor: "pointer" },
+  toast: { position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)", background: "#0AC8B9", color: "#0A1428", padding: "9px 18px", borderRadius: 4, fontSize: 13, fontWeight: 600, fontFamily: "Arial, sans-serif", boxShadow: "0 4px 20px rgba(0,0,0,0.4)" },
+  toastError: { position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)", background: "#E84057", color: "#0A1428", padding: "9px 18px", borderRadius: 4, fontSize: 13, fontWeight: 600, fontFamily: "Arial, sans-serif" },
+};
+
+ReactDOM.createRoot(document.getElementById("root")).render(<LolDictionary />);
+</script>
+</body>
+</html>
