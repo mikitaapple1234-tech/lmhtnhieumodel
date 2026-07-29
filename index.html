@@ -48,6 +48,11 @@ function LolDictionary() {
   const [toast, setToast] = useState("");
   const [closedFolders, setClosedFolders] = useState({});
 
+  // States quản lý Flashcard
+  const [isFlashcardOpen, setIsFlashcardOpen] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isFlipped, setIsFlipped] = useState(false);
+
   function toggleFolder(cat) {
     setClosedFolders((prev) => ({ ...prev, [cat]: !prev[cat] }));
   }
@@ -76,7 +81,7 @@ function LolDictionary() {
     setTimeout(() => setToast(""), 2200);
   }
 
-  // Tra cứu từ mới hoặc lấy từ có sẵn qua AI + Database (POST mặc định)
+  // Tra cứu từ mới hoặc lấy từ có sẵn qua AI + Database và đẩy lên đầu danh sách
   async function handleLookup() {
     const word = query.trim();
     if (!word) return;
@@ -91,16 +96,10 @@ function LolDictionary() {
       const parsed = await response.json();
       if (!response.ok) throw new Error(parsed.error || "API lỗi");
 
-      // Cập nhật lại danh sách trên giao diện
+      // Đẩy từ vừa tra cứu lên đầu danh sách ngay lập tức
       setEntries((prev) => {
-        const existingIdx = prev.findIndex((e) => e.id === parsed.id || e.word === parsed.word);
-        if (existingIdx >= 0) {
-          const next = [...prev];
-          next[existingIdx] = parsed;
-          return next;
-        } else {
-          return [parsed, ...prev];
-        }
+        const filteredPrev = prev.filter((e) => e.id !== parsed.id && e.word !== parsed.word);
+        return [parsed, ...filteredPrev];
       });
 
       setQuery("");
@@ -162,7 +161,7 @@ function LolDictionary() {
     }
   }
 
-  // Thêm từ thủ công (Gọi action 'manual_save' qua API)
+  // Thêm từ thủ công và đẩy lên đầu danh sách
   async function addManual() {
     const word = manualDraft.word.trim();
     if (!word) return;
@@ -184,13 +183,8 @@ function LolDictionary() {
       if (!response.ok) throw new Error(saved.error);
 
       setEntries((prev) => {
-        const existingIdx = prev.findIndex((e) => e.id === saved.id || e.word === saved.word);
-        if (existingIdx >= 0) {
-          const next = [...prev];
-          next[existingIdx] = saved;
-          return next;
-        }
-        return [saved, ...prev];
+        const filteredPrev = prev.filter((e) => e.id !== saved.id && e.word !== saved.word);
+        return [saved, ...filteredPrev];
       });
 
       setManualDraft({ word: "", pinyin: "", meaning: "", note: "", category: CATEGORIES[CATEGORIES.length - 1] });
@@ -242,6 +236,12 @@ function LolDictionary() {
             style={{ ...styles.searchBtn, opacity: looking || !query.trim() ? 0.5 : 1 }}
           >
             {looking ? "Đang tra…" : "Tra cứu"}
+          </button>
+          <button
+            onClick={() => { setCurrentIndex(0); setIsFlipped(false); setIsFlashcardOpen(true); }}
+            style={styles.flashcardHeaderBtn}
+          >
+            🎓 Ôn Flashcard
           </button>
         </div>
         {lookupError && <div style={styles.errorRow}>⚠ <span style={{ color: "#d9534f", fontSize: 13 }}>{lookupError}</span></div>}
@@ -349,6 +349,70 @@ function LolDictionary() {
         })}
       </main>
 
+      {/* Modal Flashcard ôn tập */}
+      {isFlashcardOpen && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalCard}>
+            <h3 style={{ margin: '0 0 16px 0', color: '#2d3748' }}>🎓 Ôn tập Flashcard</h3>
+            
+            {entries.length === 0 ? (
+              <p style={{ color: '#666' }}>Không có từ vựng để ôn tập!</p>
+            ) : (
+              <div>
+                <div 
+                  onClick={() => setIsFlipped(!isFlipped)}
+                  style={styles.flashcardBox}
+                >
+                  {!isFlipped ? (
+                    <div>
+                      <span style={{ fontSize: '11.5px', textTransform: 'uppercase', color: '#718096', letterSpacing: '1px' }}>Từ vựng</span>
+                      <h2 style={{ margin: '8px 0 0 0', color: '#1a202c', fontSize: '30px' }}>{entries[currentIndex].word}</h2>
+                      <span style={{ fontSize: '12.5px', color: '#a0aec0', marginTop: '12px', display: 'block' }}>(Bấm vào thẻ để lật xem nghĩa)</span>
+                    </div>
+                  ) : (
+                    <div>
+                      <span style={{ fontSize: '11.5px', textTransform: 'uppercase', color: '#3182ce', letterSpacing: '1px' }}>Phiên âm & Nghĩa</span>
+                      <p style={{ fontSize: '19px', fontWeight: 'bold', color: '#2b6cb0', margin: '6px 0' }}>{entries[currentIndex].pinyin}</p>
+                      <p style={{ fontSize: '16px', color: '#2d3748', margin: '6px 0' }}>{entries[currentIndex].meaning}</p>
+                      {entries[currentIndex].note && (
+                        <p style={{ fontSize: '12.5px', color: '#e53e3e', fontStyle: 'italic', margin: '8px 0 0 0' }}>
+                          Ghi chú: {entries[currentIndex].note}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <button 
+                    onClick={() => { setIsFlipped(false); setCurrentIndex((prev) => (prev > 0 ? prev - 1 : entries.length - 1)); }}
+                    style={styles.modalNavBtn}
+                  >
+                    ⬅ Trước
+                  </button>
+                  <span style={{ fontSize: '13.5px', color: '#4a5568', fontWeight: '600' }}>
+                    {currentIndex + 1} / {entries.length}
+                  </span>
+                  <button 
+                    onClick={() => { setIsFlipped(false); setCurrentIndex((prev) => (prev < entries.length - 1 ? prev + 1 : 0)); }}
+                    style={styles.modalNavBtn}
+                  >
+                    Sau ➡
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <button 
+              onClick={() => setIsFlashcardOpen(false)}
+              style={styles.modalCloseBtn}
+            >
+              Đóng ôn tập
+            </button>
+          </div>
+        </div>
+      )}
+
       {toast && <div style={styles.toast}>{toast}</div>}
       {loadError && <div style={styles.toastError}>Có sự cố kết nối Database — vui lòng kiểm tra lại.</div>}
     </div>
@@ -362,9 +426,10 @@ const styles = {
   title: { fontSize: 26, fontWeight: 700, letterSpacing: 1, margin: 0, color: "#1a202c", textShadow: "0 2px 4px rgba(255,255,255,0.8)" },
   subtitle: { fontSize: 12.5, color: "#4a5568", marginTop: 6, letterSpacing: 0.4, fontWeight: 600, textShadow: "0 1px 2px rgba(255,255,255,0.8)" },
   searchCard: { maxWidth: 640, margin: "0 auto 18px", background: "rgba(255, 255, 255, 0.9)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.6)", borderRadius: 8, padding: 14, boxShadow: "0 4px 20px rgba(0, 0, 0, 0.08)" },
-  searchRow: { display: "flex", gap: 8 },
-  searchInput: { flex: 1, background: "#fff", border: "1px solid #cbd5e0", borderRadius: 4, padding: "11px 12px", color: "#2d3748", fontSize: 15, fontFamily: "inherit", outline: "none" },
-  searchBtn: { display: "flex", alignItems: "center", gap: 6, background: "#3182ce", color: "#fff", border: "none", borderRadius: 4, padding: "0 18px", fontWeight: 700, fontSize: 13.5, cursor: "pointer", boxShadow: "0 2px 8px rgba(49, 130, 206, 0.3)" },
+  searchRow: { display: "flex", gap: 8, flexWrap: "wrap" },
+  searchInput: { flex: 1, minWidth: 160, background: "#fff", border: "1px solid #cbd5e0", borderRadius: 4, padding: "11px 12px", color: "#2d3748", fontSize: 15, fontFamily: "inherit", outline: "none" },
+  searchBtn: { display: "flex", alignItems: "center", gap: 6, background: "#3182ce", color: "#fff", border: "none", borderRadius: 4, padding: "0 16px", fontWeight: 700, fontSize: 13.5, cursor: "pointer", boxShadow: "0 2px 8px rgba(49, 130, 206, 0.3)" },
+  flashcardHeaderBtn: { display: "flex", alignItems: "center", gap: 6, background: "#38a169", color: "#fff", border: "none", borderRadius: 4, padding: "0 16px", fontWeight: 700, fontSize: 13.5, cursor: "pointer", boxShadow: "0 2px 8px rgba(56, 161, 105, 0.3)" },
   errorRow: { display: "flex", alignItems: "center", gap: 6, marginTop: 8 },
   listHeader: { maxWidth: 640, margin: "0 auto 10px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 },
   listHeaderLeft: { display: "flex", alignItems: "center", gap: 6 },
@@ -395,6 +460,11 @@ const styles = {
   iconBtn: { background: "transparent", border: "1px solid #cbd5e0", color: "#4a5568", borderRadius: 4, padding: "6px 9px", cursor: "pointer" },
   iconBtnGood: { background: "#3182ce", border: "none", color: "#fff", borderRadius: 4, padding: "6px 9px", cursor: "pointer" },
   iconBtnBad: { background: "transparent", border: "1px solid #e53e3e", color: "#e53e3e", borderRadius: 4, padding: "6px 9px", cursor: "pointer" },
+  modalOverlay: { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 },
+  modalCard: { background: 'white', padding: '24px', borderRadius: '12px', width: '420px', maxWidth: '90%', textAlign: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' },
+  flashcardBox: { border: '2px solid #e2e8f0', borderRadius: '10px', padding: '36px 20px', minHeight: '150px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', backgroundColor: '#f7fafc', margin: '10px 0 20px 0', userSelect: 'none' },
+  modalNavBtn: { padding: '6px 14px', background: '#edf2f7', color: '#333', border: '1px solid #cbd5e0', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 },
+  modalCloseBtn: { width: '100%', padding: '10px', background: '#e53e3e', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 700, cursor: 'pointer' },
   toast: { position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)", background: "#3182ce", color: "#fff", padding: "9px 18px", borderRadius: 6, fontSize: 13, fontWeight: 600, boxShadow: "0 4px 20px rgba(49, 130, 206, 0.4)" },
   toastError: { position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)", background: "#e53e3e", color: "#fff", padding: "9px 18px", borderRadius: 6, fontSize: 13, fontWeight: 600 },
 };
