@@ -1,4 +1,4 @@
-// Vercel serverless function — Tích hợp Supabase + Gemini 1.5 Flash & Groq
+// Vercel serverless function — Tích hợp Supabase + Gemini & Groq (Đa model dự phòng)
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -122,37 +122,48 @@ Nếu từ không thuộc rõ về LMHT, chọn "Từ vựng chung".`;
     };
   }
 
-  // BƯỚC 1: Gemini 1.5 Flash
+  // BƯỚC 1: Thử lần lượt các model Gemini (có cơ chế dự phòng tự động chuyển đổi)
   if (geminiKey) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${geminiKey}`;
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `${system}\n\nTừ cần tra: ${cleanWord}` }] }],
-          generationConfig: { responseMimeType: "application/json" },
-        }),
-      });
+    const geminiModels = [
+      "gemini-3.5-flash",
+      "gemini-3.1-flash-lite",
+      "gemini-2.5-flash",
+      "gemini-3-flash-preview"
+    ];
 
-      if (!response.ok) {
-        lastErrorDetail = `Gemini lỗi: ${await response.text()}`;
-      } else {
-        const data = await response.json();
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) {
-          const parsed = JSON.parse(text.replace(/```json|```/g, "").trim());
-          aiResult = normalize(parsed);
+    for (const modelName of geminiModels) {
+      if (aiResult) break; // Nếu đã lấy được kết quả từ một model thành công thì dừng vòng lặp
+
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiKey}`;
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: `${system}\n\nTừ cần tra: ${cleanWord}` }] }],
+            generationConfig: { responseMimeType: "application/json" },
+          }),
+        });
+
+        if (!response.ok) {
+          lastErrorDetail += ` | Model ${modelName} lỗi: ${await response.text()}`;
         } else {
-          lastErrorDetail = "Gemini không trả về nội dung";
+          const data = await response.json();
+          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) {
+            const parsed = JSON.parse(text.replace(/```json|```/g, "").trim());
+            aiResult = normalize(parsed);
+          } else {
+            lastErrorDetail += ` | Model ${modelName} không trả về nội dung`;
+          }
         }
+      } catch (e) {
+        lastErrorDetail += ` | Lỗi model ${modelName}: ${String(e)}`;
       }
-    } catch (e) {
-      lastErrorDetail = `Lỗi Gemini: ${String(e)}`;
     }
   }
 
-  // BƯỚC 2: Groq (nếu Gemini không thành công)
+  // BƯỚC 2: Groq (nếu toàn bộ các model Gemini đều không thành công)
   if (!aiResult && groqKey) {
     try {
       const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -212,4 +223,4 @@ Nếu từ không thuộc rõ về LMHT, chọn "Từ vựng chung".`;
   }
 
   return res.status(200).json(aiResult);
-      }
+}
