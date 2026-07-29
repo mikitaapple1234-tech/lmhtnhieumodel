@@ -7,14 +7,24 @@
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  body {
+    margin: 0;
+    overflow-x: hidden;
+    background-image: url('https://image.xportsnews.com/contents/images/upload/article/2024/0118/1705566127551816.jpg');
+    background-position: center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    background-size: cover;
+  }
+</style>
 </head>
-<body style="margin:0;">
-<div id="root"></div>
+<body style="margin:0; overflow-x: hidden;">
+<div id="root" style="position: relative; z-index: 2;"></div>
 
-<script type="text/babel" data-presets="react">
+<script type="text/babel">
 const { useState, useEffect } = React;
 
-const STORAGE_KEY = "lol-hanzi-entries";
 const CATEGORIES = [
   "Tên tướng",
   "Kỹ năng / Chiêu thức",
@@ -24,54 +34,46 @@ const CATEGORIES = [
   "Từ vựng chung",
 ];
 
-function uid() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-}
-
 function LolDictionary() {
   const [entries, setEntries] = useState([]);
-  const [loaded, setLoaded] = useState(false);
-  const [loadError, setLoadError] = useState(false);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("");
   const [looking, setLooking] = useState(false);
   const [lookupError, setLookupError] = useState("");
-  const [searchResult, setSearchResult] = useState(null); // Từ vừa tìm kiếm hiển thị ở khung trắng
+  
+  // Ô trắng hiển thị kết quả tra cứu gần nhất ngay dưới thanh tìm kiếm
+  const [latestResult, setLatestResult] = useState(null);
+
   const [editingId, setEditingId] = useState(null);
-  const [editDraft, setEditDraft] = useState({ pinyin: "", meaning: "", note: "", category: CATEGORIES[CATEGORIES.length - 1] });
+  const [editDraft, setEditDraft] = useState({ pinyin: "", meaning: "", note: "", category: CATEGORIES[5] });
   const [manualOpen, setManualOpen] = useState(false);
-  const [manualDraft, setManualDraft] = useState({ word: "", pinyin: "", meaning: "", note: "", category: CATEGORIES[CATEGORIES.length - 1] });
+  const [manualDraft, setManualDraft] = useState({ word: "", pinyin: "", meaning: "", note: "", category: CATEGORIES[5] });
   const [toast, setToast] = useState("");
   const [closedFolders, setClosedFolders] = useState({});
 
-  // Navigation & Flashcard States
-  const [activeTab, setActiveTab] = useState("dictionary"); // "dictionary" | "flashcard"
-  const [fcCategory, setFcCategory] = useState("Tất cả");
-  const [fcIndex, setFcIndex] = useState(0);
-  const [fcFlipped, setFcFlipped] = useState(false);
+  // States Flashcard
+  const [isFlashcardOpen, setIsFlashcardOpen] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isFlipped, setIsFlipped] = useState(false);
+
+  useEffect(() => {
+    fetchEntries();
+  }, []);
+
+  async function fetchEntries() {
+    try {
+      const res = await fetch('/api/lookup');
+      if (res.ok) {
+        const data = await res.json();
+        setEntries(data);
+      }
+    } catch (e) {
+      console.error("Lỗi khi tải từ vựng:", e);
+    }
+  }
 
   function toggleFolder(cat) {
     setClosedFolders((prev) => ({ ...prev, [cat]: !prev[cat] }));
-  }
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        setEntries(parsed.map((e) => ({ ...e, category: e.category || "Từ vựng chung" })));
-      }
-    } catch (e) {}
-    setLoaded(true);
-  }, []);
-
-  function persist(next) {
-    setEntries(next);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch (e) {
-      setLoadError(true);
-    }
   }
 
   function showToast(msg) {
@@ -80,54 +82,111 @@ function LolDictionary() {
   }
 
   async function handleLookup() {
-    const word = query.trim();
-    if (!word) return;
+    const wordClean = query.trim();
+    if (!wordClean) return;
     setLookupError("");
     setLooking(true);
+
     try {
-      const response = await fetch("/api/lookup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ word }),
+      const res = await fetch('/api/lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ word: wordClean })
       });
-      const parsed = await response.json();
-      if (!response.ok) throw new Error(parsed.error || "API lỗi");
 
-      const existingIdx = entries.findIndex((e) => e.word === word);
-      const newEntry = {
-        id: existingIdx >= 0 ? entries[existingIdx].id : uid(),
-        word,
-        pinyin: parsed.pinyin || "",
-        meaning: parsed.meaning || "",
-        note: parsed.note || "",
-        category: parsed.category || "Từ vựng chung",
-        createdAt: existingIdx >= 0 ? entries[existingIdx].createdAt : Date.now(),
-      };
-
-      let next;
-      if (existingIdx >= 0) {
-        next = [...entries];
-        next[existingIdx] = newEntry;
-      } else {
-        next = [newEntry, ...entries];
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Lỗi tra cứu từ vựng");
       }
 
-      // 1. Tự động thêm từ đó vào thư mục / bộ nhớ LocalStorage
-      persist(next);
+      // Đưa kết quả vào ô trắng ngay dưới thanh tìm kiếm để bạn đọc nghĩa/pinyin trước
+      setLatestResult(data);
+      
+      // Đồng thời cập nhật danh sách tổng bên dưới
+      setEntries(prev => {
+        const filtered = prev.filter(e => e.id !== data.id && e.word !== data.word);
+        return [data, ...filtered];
+      });
 
-      // 2. Hiển thị từ vừa tìm kiếm vào KHUNG TRẮNG
-      setSearchResult(newEntry);
-
-      // 3. Tự động mở thư mục tương ứng ở bên dưới
-      if (newEntry.category) {
-        setClosedFolders((prev) => ({ ...prev, [newEntry.category]: false }));
-      }
-
-      showToast(existingIdx >= 0 ? "Đã cập nhật từ vào thư mục!" : "Đã tự động thêm vào thư mục!");
-    } catch (e) {
-      setLookupError(e.message || "Không tra cứu được từ này. Thử lại nhé.");
+      setQuery("");
+      showToast("Đã tra cứu thành công!");
+    } catch (err) {
+      setLookupError(err.message);
     } finally {
       setLooking(false);
+    }
+  }
+
+  async function deleteEntry(id) {
+    if (!confirm("Bạn có chắc chắn muốn xóa từ này?")) return;
+    try {
+      const res = await fetch('/api/lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', id })
+      });
+      if (res.ok) {
+        setEntries(prev => prev.filter(e => e.id !== id));
+        if (latestResult && latestResult.id === id) setLatestResult(null);
+        showToast("Đã xoá từ");
+      }
+    } catch (e) {
+      showToast("Lỗi khi xóa từ");
+    }
+  }
+
+  async function saveEdit(id) {
+    try {
+      const target = entries.find(e => e.id === id);
+      const payload = {
+        action: 'manual_save',
+        id,
+        word: target.word,
+        ...editDraft
+      };
+
+      const res = await fetch('/api/lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        const updated = await res.json();
+        setEntries(prev => prev.map(e => e.id === id ? updated : e));
+        if (latestResult && latestResult.id === id) setLatestResult(updated);
+        setEditingId(null);
+        showToast("Đã lưu chỉnh sửa");
+      }
+    } catch (e) {
+      showToast("Lỗi khi lưu");
+    }
+  }
+
+  async function addManual() {
+    const word = manualDraft.word.trim();
+    if (!word) return;
+
+    try {
+      const res = await fetch('/api/lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'manual_save',
+          ...manualDraft
+        })
+      });
+
+      if (res.ok) {
+        const saved = await res.json();
+        setLatestResult(saved);
+        setEntries(prev => [saved, ...prev.filter(e => e.word !== saved.word)]);
+        setManualDraft({ word: "", pinyin: "", meaning: "", note: "", category: CATEGORIES[5] });
+        setManualOpen(false);
+        showToast("Đã thêm từ mới thành công");
+      }
+    } catch (e) {
+      showToast("Lỗi khi thêm từ");
     }
   }
 
@@ -136,56 +195,6 @@ function LolDictionary() {
     setEditDraft({ pinyin: entry.pinyin, meaning: entry.meaning, note: entry.note, category: entry.category || "Từ vựng chung" });
   }
 
-  function saveEdit(id) {
-    const next = entries.map((e) => (e.id === id ? { ...e, ...editDraft } : e));
-    persist(next);
-    if (searchResult && searchResult.id === id) {
-      setSearchResult((prev) => ({ ...prev, ...editDraft }));
-    }
-    setEditingId(null);
-    showToast("Đã lưu chỉnh sửa");
-  }
-
-  function deleteEntry(id) {
-    const next = entries.filter((e) => e.id !== id);
-    persist(next);
-    if (searchResult && searchResult.id === id) {
-      setSearchResult(null);
-    }
-    showToast("Đã xoá từ");
-  }
-
-  function addManual() {
-    const word = manualDraft.word.trim();
-    if (!word) return;
-    const existingIdx = entries.findIndex((e) => e.word === word);
-    const entry = {
-      id: existingIdx >= 0 ? entries[existingIdx].id : uid(),
-      word,
-      pinyin: manualDraft.pinyin.trim(),
-      meaning: manualDraft.meaning.trim(),
-      note: manualDraft.note.trim(),
-      category: manualDraft.category || "Từ vựng chung",
-      createdAt: existingIdx >= 0 ? entries[existingIdx].createdAt : Date.now(),
-    };
-    let next;
-    if (existingIdx >= 0) {
-      next = [...entries];
-      next[existingIdx] = entry;
-    } else {
-      next = [entry, ...entries];
-    }
-    persist(next);
-    setSearchResult(entry);
-    if (entry.category) {
-      setClosedFolders((prev) => ({ ...prev, [entry.category]: false }));
-    }
-    setManualDraft({ word: "", pinyin: "", meaning: "", note: "", category: CATEGORIES[CATEGORIES.length - 1] });
-    setManualOpen(false);
-    showToast("Đã thêm & tự động lưu từ mới");
-  }
-
-  // Lọc danh sách từ
   const filtered = entries.filter((e) => {
     const q = filter.trim().toLowerCase();
     if (!q) return true;
@@ -202,398 +211,280 @@ function LolDictionary() {
     items: filtered.filter((e) => (e.category || "Từ vựng chung") === cat),
   })).filter((g) => g.items.length > 0);
 
-  // Danh sách cho Flashcard
-  const fcPool = fcCategory === "Tất cả"
-    ? entries
-    : entries.filter((e) => (e.category || "Từ vựng chung") === fcCategory);
-
-  const safeFcIndex = fcPool.length > 0 ? Math.min(fcIndex, fcPool.length - 1) : 0;
-  const currentFc = fcPool[safeFcIndex] || null;
-
-  function nextFc() {
-    if (fcPool.length === 0) return;
-    setFcFlipped(false);
-    setFcIndex((prev) => (prev + 1) % fcPool.length);
-  }
-
-  function prevFc() {
-    if (fcPool.length === 0) return;
-    setFcFlipped(false);
-    setFcIndex((prev) => (prev - 1 + fcPool.length) % fcPool.length);
-  }
-
-  function shuffleFc() {
-    if (fcPool.length <= 1) return;
-    setFcFlipped(false);
-    const rand = Math.floor(Math.random() * fcPool.length);
-    setFcIndex(rand);
-  }
-
   return (
     <div style={styles.page}>
-      <div style={styles.bgRunes} />
-      
-      {/* Header */}
       <header style={styles.header}>
         <div style={styles.brandRow}>
-          <span style={{ fontSize: 22 }}>⚔️</span>
+          <span style={{ fontSize: 22 }}>📖</span>
           <h1 style={styles.title}>Rune Lexicon</h1>
         </div>
         <p style={styles.subtitle}>Từ điển Hán ngữ · thuật ngữ Liên Minh Huyền Thoại</p>
-        
-        {/* Tab chuyển đổi giữa Từ điển & Flashcard */}
-        <div style={styles.tabContainer}>
-          <button
-            style={{ ...styles.tabBtn, ...(activeTab === "dictionary" ? styles.tabActive : {}) }}
-            onClick={() => setActiveTab("dictionary")}
-          >
-            📖 Từ điển ({entries.length})
-          </button>
-          <button
-            style={{ ...styles.tabBtn, ...(activeTab === "flashcard" ? styles.tabActive : {}) }}
-            onClick={() => {
-              setActiveTab("flashcard");
-              setFcIndex(0);
-              setFcFlipped(false);
-            }}
-          >
-            🎴 Thẻ ghi nhớ (Flashcards)
-          </button>
-        </div>
       </header>
 
-      {/* CHẾ ĐỘ 1: TÌM KIẾM VÀ TỪ ĐIỂN */}
-      {activeTab === "dictionary" && (
-        <>
-          {/* KHU VỰC TÌM KIẾM */}
-          <section style={styles.searchCard}>
-            <div style={styles.searchRow}>
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") handleLookup(); }}
-                placeholder="Nhập từ tiếng Trung cần tra… ví dụ 打野"
-                style={styles.searchInput}
-              />
-              <button
-                onClick={handleLookup}
-                disabled={looking || !query.trim()}
-                style={{ ...styles.searchBtn, opacity: looking || !query.trim() ? 0.5 : 1 }}
-              >
-                {looking ? "Đang tra…" : "Tra cứu"}
-              </button>
-            </div>
-            {lookupError && <div style={styles.errorRow}>⚠ <span style={{ color: "#E84057", fontSize: 13 }}>{lookupError}</span></div>}
+      <section style={styles.searchCard}>
+        <div style={styles.searchRow}>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") handleLookup(); }}
+            placeholder="Nhập từ tiếng Trung cần tra… ví dụ 打野"
+            style={styles.searchInput}
+          />
+          <button
+            onClick={handleLookup}
+            disabled={looking || !query.trim()}
+            style={{ ...styles.searchBtn, opacity: looking || !query.trim() ? 0.5 : 1 }}
+          >
+            {looking ? "Đang tra…" : "Tra cứu"}
+          </button>
+          <button
+            onClick={() => { setCurrentIndex(0); setIsFlipped(false); setIsFlashcardOpen(true); }}
+            style={styles.flashcardHeaderBtn}
+          >
+            🎓 Ôn Flashcard
+          </button>
+        </div>
+        {lookupError && <div style={styles.errorRow}>⚠ <span style={{ color: "#d9534f", fontSize: 13 }}>{lookupError}</span></div>}
+      </section>
 
-            {/* KHUNG TRẮNG HIỂN THỊ TỪ VỪA TÌM KIẾM */}
-            {searchResult && (
-              <div style={styles.whiteResultBox}>
-                <div style={styles.whiteResultHeader}>
-                  <span style={styles.whiteResultTitle}>📌 TỪ VỪA TÌM KIẾM</span>
-                  <button style={styles.whiteCloseBtn} onClick={() => setSearchResult(null)} title="Đóng khung">✕</button>
-                </div>
-                
-                <div style={styles.whiteResultBody}>
-                  <div style={styles.whiteWordRow}>
-                    <span style={styles.whiteWord}>{searchResult.word}</span>
-                    <span style={styles.whitePinyin}>{searchResult.pinyin}</span>
-                    <span style={styles.whiteCategoryBadge}>📁 {searchResult.category}</span>
-                  </div>
-
-                  <div style={styles.whiteMeaning}>
-                    <strong>Nghĩa:</strong> {searchResult.meaning}
-                  </div>
-
-                  {searchResult.note && (
-                    <div style={styles.whiteNote}>
-                      <strong>Ghi chú:</strong> {searchResult.note}
-                    </div>
-                  )}
-
-                  {/* BÁO TỰ ĐỘNG LƯU VÀO THƯ MỤC */}
-                  <div style={styles.autoSaveBadge}>
-                    ✓ Đã tự động thêm từ này vào thư mục <strong>"{searchResult.category}"</strong>
-                  </div>
-                </div>
-              </div>
-            )}
-          </section>
-
-          {/* Header danh sách các thư mục */}
-          <section style={styles.listHeader}>
-            <div style={styles.listHeaderLeft}>
-              <span style={styles.listCount}>📖 {entries.length} mục từ đã được lưu</span>
-            </div>
-            <div style={styles.filterRow}>
-              <input
-                value={filter}
-                onChange={(e) => setFilter(e.target.value)}
-                placeholder="Lọc từ vựng…"
-                style={styles.filterInput}
-              />
-              <button style={styles.addBtn} onClick={() => setManualOpen((o) => !o)}>+ Thêm từ</button>
-            </div>
-          </section>
-
-          {/* Form thêm từ thủ công */}
-          {manualOpen && (
-            <section style={styles.manualCard}>
-              <div style={styles.manualGrid}>
-                <input placeholder="Từ (chữ Hán)" value={manualDraft.word} onChange={(e) => setManualDraft({ ...manualDraft, word: e.target.value })} style={styles.manualInput} />
-                <input placeholder="Pinyin" value={manualDraft.pinyin} onChange={(e) => setManualDraft({ ...manualDraft, pinyin: e.target.value })} style={styles.manualInput} />
-              </div>
-              <input placeholder="Nghĩa" value={manualDraft.meaning} onChange={(e) => setManualDraft({ ...manualDraft, meaning: e.target.value })} style={{ ...styles.manualInput, width: "100%", marginTop: 8 }} />
-              <textarea placeholder="Ghi chú (không bắt buộc)" value={manualDraft.note} onChange={(e) => setManualDraft({ ...manualDraft, note: e.target.value })} style={{ ...styles.manualInput, width: "100%", marginTop: 8, minHeight: 60, resize: "vertical" }} />
-              <select value={manualDraft.category} onChange={(e) => setManualDraft({ ...manualDraft, category: e.target.value })} style={{ ...styles.manualInput, width: "100%", marginTop: 8 }}>
-                {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                <button style={styles.saveBtn} onClick={addManual} disabled={!manualDraft.word.trim()}>✓ Lưu</button>
-                <button style={styles.cancelBtn} onClick={() => setManualOpen(false)}>✕ Huỷ</button>
-              </div>
-            </section>
-          )}
-
-          {/* Danh sách các Thư mục từ vựng đã tự động thêm */}
-          <main style={styles.list}>
-            {!loaded && <div style={styles.emptyState}>Đang tải từ điển…</div>}
-            {loaded && entries.length === 0 && (
-              <div style={styles.emptyState}>
-                Chưa có từ nào. Tra một thuật ngữ LMHT như <span style={{ color: "#C89B3C" }}>打野</span> (đi rừng) để bắt đầu.
-              </div>
-            )}
-            {loaded && entries.length > 0 && filtered.length === 0 && (
-              <div style={styles.emptyState}>Không tìm thấy từ phù hợp với bộ lọc.</div>
-            )}
-            {grouped.map(({ category, items }) => {
-              const isClosed = !!closedFolders[category];
-              return (
-                <div key={category} style={styles.folder}>
-                  <div style={styles.folderHeader} onClick={() => toggleFolder(category)}>
-                    <span style={styles.folderArrow}>{isClosed ? "▶" : "▼"}</span>
-                    <span style={styles.folderName}>📁 {category}</span>
-                    <span style={styles.folderCount}>{items.length}</span>
-                  </div>
-                  {!isClosed && (
-                    <div style={styles.folderBody}>
-                      {items.map((entry) => (
-                        <div key={entry.id} style={styles.card}>
-                          <div style={styles.cardTop}>
-                            <div>
-                              <span style={styles.word}>{entry.word}</span>
-                              <span style={styles.pinyin}>
-                                {editingId === entry.id ? (
-                                  <input value={editDraft.pinyin} onChange={(e) => setEditDraft({ ...editDraft, pinyin: e.target.value })} style={styles.inlineInput} />
-                                ) : entry.pinyin}
-                              </span>
-                            </div>
-                            <div style={{ display: "flex", gap: 6 }}>
-                              {editingId === entry.id ? (
-                                <>
-                                  <button style={styles.iconBtnGood} onClick={() => saveEdit(entry.id)}>✓</button>
-                                  <button style={styles.iconBtn} onClick={() => setEditingId(null)}>✕</button>
-                                </>
-                              ) : (
-                                <>
-                                  <button style={styles.iconBtn} onClick={() => startEdit(entry)}>✎</button>
-                                  <button style={styles.iconBtnBad} onClick={() => deleteEntry(entry.id)}>🗑</button>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                          {editingId === entry.id ? (
-                            <>
-                              <input value={editDraft.meaning} onChange={(e) => setEditDraft({ ...editDraft, meaning: e.target.value })} style={{ ...styles.inlineInput, width: "100%", marginTop: 8, fontSize: 14 }} placeholder="Nghĩa" />
-                              <textarea value={editDraft.note} onChange={(e) => setEditDraft({ ...editDraft, note: e.target.value })} style={{ ...styles.inlineInput, width: "100%", marginTop: 6, minHeight: 50, resize: "vertical" }} placeholder="Ghi chú" />
-                              <select value={editDraft.category} onChange={(e) => setEditDraft({ ...editDraft, category: e.target.value })} style={{ ...styles.inlineInput, width: "100%", marginTop: 6 }}>
-                                {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                              </select>
-                            </>
-                          ) : (
-                            <>
-                              <p style={styles.meaning}>{entry.meaning}</p>
-                              {entry.note && <p style={styles.note}>{entry.note}</p>}
-                            </>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </main>
-        </>
-      )}
-
-      {/* CHẾ ĐỘ 2: FLASHCARDS (THẺ GHI NHỚ) */}
-      {activeTab === "flashcard" && (
-        <section style={styles.flashcardContainer}>
-          <div style={styles.fcControlsTop}>
-            <div style={styles.fcFilterGroup}>
-              <label style={styles.fcLabel}>Thư mục ôn tập:</label>
-              <select
-                value={fcCategory}
-                onChange={(e) => {
-                  setFcCategory(e.target.value);
-                  setFcIndex(0);
-                  setFcFlipped(false);
-                }}
-                style={styles.fcSelect}
-              >
-                <option value="Tất cả">Tất cả từ vựng ({entries.length})</option>
-                {CATEGORIES.map((c) => {
-                  const count = entries.filter((e) => (e.category || "Từ vựng chung") === c).length;
-                  return <option key={c} value={c}>{c} ({count})</option>;
-                })}
-              </select>
-            </div>
-            
-            <button style={styles.fcShuffleBtn} onClick={shuffleFc} disabled={fcPool.length <= 1}>
-              🔀 Tráo ngẫu nhiên
-            </button>
+      {/* Ô TRẮNG HIỂN THỊ KẾT QUẢ TRA CỨU NGAY LẬP TỨC */}
+      {latestResult && (
+        <section style={styles.latestResultCard}>
+          <div style={styles.latestResultHeader}>
+            <span style={styles.latestResultBadge}>✨ Từ mới tra cứu</span>
+            <button onClick={() => setLatestResult(null)} style={styles.latestResultClose}>✕</button>
           </div>
-
-          {fcPool.length === 0 ? (
-            <div style={styles.emptyState}>
-              Không có từ vựng nào trong thư mục này để ôn tập.
-              <br />Hãy quay lại tab <strong>Từ điển</strong> để tra từ mới nhé!
-            </div>
-          ) : (
-            <>
-              <div
-                style={{
-                  ...styles.fcCard,
-                  borderColor: fcFlipped ? "#0AC8B9" : "#C89B3C",
-                  boxShadow: fcFlipped ? "0 0 20px rgba(10,200,185,0.2)" : "0 0 20px rgba(200,155,60,0.15)",
-                }}
-                onClick={() => setFcFlipped((f) => !f)}
-              >
-                <div style={styles.fcCardCategory}>📁 {currentFc.category || "Từ vựng chung"}</div>
-                
-                <div style={styles.fcCardMain}>
-                  <div style={styles.fcWord}>{currentFc.word}</div>
-                  
-                  {fcFlipped ? (
-                    <div style={styles.fcFlippedContent}>
-                      <div style={styles.fcPinyin}>{currentFc.pinyin}</div>
-                      <div style={styles.fcMeaning}>{currentFc.meaning}</div>
-                      {currentFc.note && <div style={styles.fcNote}>💡 {currentFc.note}</div>}
-                    </div>
-                  ) : (
-                    <div style={styles.fcHint}>👆 Nhấp hoặc bấm "Lật thẻ" để xem nghĩa</div>
-                  )}
-                </div>
-
-                <div style={styles.fcProgress}>
-                  Thẻ {safeFcIndex + 1} / {fcPool.length}
-                </div>
-              </div>
-
-              <div style={styles.fcControlsBottom}>
-                <button style={styles.fcNavBtn} onClick={prevFc}>⏮ Trước</button>
-                <button style={styles.fcFlipBtn} onClick={() => setFcFlipped((f) => !f)}>
-                  🔄 {fcFlipped ? "Ẩn đáp án" : "Lật xem nghĩa"}
-                </button>
-                <button style={styles.fcNavBtn} onClick={nextFc}>Tiếp ⏭</button>
-              </div>
-            </>
-          )}
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginTop: '6px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '28px', fontWeight: '700', color: '#1a202c' }}>{latestResult.word}</span>
+            <span style={{ fontSize: '15px', fontWeight: '600', color: '#3182ce' }}>{latestResult.pinyin}</span>
+            <span style={{ fontSize: '12px', background: '#edf2f7', padding: '2px 8px', borderRadius: '10px', color: '#4a5568' }}>📁 {latestResult.category}</span>
+          </div>
+          <p style={{ fontSize: '15px', color: '#2d3748', margin: '8px 0 4px 0', fontWeight: '500' }}>{latestResult.meaning}</p>
+          {latestResult.note && <p style={{ fontSize: '13px', color: '#718096', fontStyle: 'italic', margin: '4px 0 0 0' }}>Ghi chú: {latestResult.note}</p>}
         </section>
       )}
 
+      <section style={styles.listHeader}>
+        <div style={styles.listHeaderLeft}>
+          <span style={styles.listCount}>📚 {entries.length} mục từ</span>
+        </div>
+        <div style={styles.filterRow}>
+          <input
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder="Lọc trong từ điển…"
+            style={styles.filterInput}
+          />
+          <button style={styles.addBtn} onClick={() => setManualOpen((o) => !o)}>+ Thêm từ</button>
+        </div>
+      </section>
+
+      {manualOpen && (
+        <section style={styles.manualCard}>
+          <div style={styles.manualGrid}>
+            <input placeholder="Từ (chữ Hán)" value={manualDraft.word} onChange={(e) => setManualDraft({ ...manualDraft, word: e.target.value })} style={styles.manualInput} />
+            <input placeholder="Pinyin" value={manualDraft.pinyin} onChange={(e) => setManualDraft({ ...manualDraft, pinyin: e.target.value })} style={styles.manualInput} />
+          </div>
+          <input placeholder="Nghĩa" value={manualDraft.meaning} onChange={(e) => setManualDraft({ ...manualDraft, meaning: e.target.value })} style={{ ...styles.manualInput, width: "100%", marginTop: 8 }} />
+          <textarea placeholder="Ghi chú (không bắt buộc)" value={manualDraft.note} onChange={(e) => setManualDraft({ ...manualDraft, note: e.target.value })} style={{ ...styles.manualInput, width: "100%", marginTop: 8, minHeight: 60, resize: "vertical" }} />
+          <select value={manualDraft.category} onChange={(e) => setManualDraft({ ...manualDraft, category: e.target.value })} style={{ ...styles.manualInput, width: "100%", marginTop: 8 }}>
+            {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            <button style={styles.saveBtn} onClick={addManual} disabled={!manualDraft.word.trim()}>✓ Lưu</button>
+            <button style={styles.cancelBtn} onClick={() => setManualOpen(false)}>✕ Huỷ</button>
+          </div>
+        </section>
+      )}
+
+      <main style={styles.list}>
+        {entries.length === 0 && (
+          <div style={styles.emptyState}>Chưa có từ nào trong từ điển. Hãy tra cứu một từ mới ở trên.</div>
+        )}
+        {entries.length > 0 && filtered.length === 0 && (
+          <div style={styles.emptyState}>Không tìm thấy từ phù hợp với bộ lọc.</div>
+        )}
+        {grouped.map(({ category, items }) => {
+          const isClosed = !!closedFolders[category];
+          return (
+            <div key={category} style={styles.folder}>
+              <div style={styles.folderHeader} onClick={() => toggleFolder(category)}>
+                <span style={styles.folderArrow}>{isClosed ? "▶" : "▼"}</span>
+                <span style={styles.folderName}>📁 {category}</span>
+                <span style={styles.folderCount}>{items.length}</span>
+              </div>
+              {!isClosed && (
+                <div style={styles.folderBody}>
+                  {items.map((entry) => (
+                    <div key={entry.id} style={styles.card}>
+                      <div style={styles.cardTop}>
+                        <div>
+                          <span style={styles.word}>{entry.word}</span>
+                          <span style={styles.pinyin}>
+                            {editingId === entry.id ? (
+                              <input value={editDraft.pinyin} onChange={(e) => setEditDraft({ ...editDraft, pinyin: e.target.value })} style={styles.inlineInput} />
+                            ) : entry.pinyin}
+                          </span>
+                        </div>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          {editingId === entry.id ? (
+                            <>
+                              <button style={styles.iconBtnGood} onClick={() => saveEdit(entry.id)}>✓</button>
+                              <button style={styles.iconBtn} onClick={() => setEditingId(null)}>✕</button>
+                            </>
+                          ) : (
+                            <>
+                              <button style={styles.iconBtn} onClick={() => startEdit(entry)}>✎</button>
+                              <button style={styles.iconBtnBad} onClick={() => deleteEntry(entry.id)}>🗑</button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      {editingId === entry.id ? (
+                        <>
+                          <input value={editDraft.meaning} onChange={(e) => setEditDraft({ ...editDraft, meaning: e.target.value })} style={{ ...styles.inlineInput, width: "100%", marginTop: 8, fontSize: 14 }} placeholder="Nghĩa" />
+                          <textarea value={editDraft.note} onChange={(e) => setEditDraft({ ...editDraft, note: e.target.value })} style={{ ...styles.inlineInput, width: "100%", marginTop: 6, minHeight: 50, resize: "vertical" }} placeholder="Ghi chú" />
+                          <select value={editDraft.category} onChange={(e) => setEditDraft({ ...editDraft, category: e.target.value })} style={{ ...styles.inlineInput, width: "100%", marginTop: 6 }}>
+                            {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                        </>
+                      ) : (
+                        <>
+                          <p style={styles.meaning}>{entry.meaning}</p>
+                          {entry.note && <p style={styles.note}>{entry.note}</p>}
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </main>
+
+      {/* Modal Flashcard */}
+      {isFlashcardOpen && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalCard}>
+            <h3 style={{ margin: '0 0 16px 0', color: '#2d3748' }}>🎓 Ôn tập Flashcard</h3>
+            
+            {entries.length === 0 ? (
+              <p style={{ color: '#666' }}>Không có từ vựng để ôn tập!</p>
+            ) : (
+              <div>
+                <div 
+                  onClick={() => setIsFlipped(!isFlipped)}
+                  style={styles.flashcardBox}
+                >
+                  {!isFlipped ? (
+                    <div>
+                      <span style={{ fontSize: '11.5px', textTransform: 'uppercase', color: '#718096', letterSpacing: '1px' }}>Từ vựng</span>
+                      <h2 style={{ margin: '8px 0 0 0', color: '#1a202c', fontSize: '30px' }}>{entries[currentIndex].word}</h2>
+                      <span style={{ fontSize: '12.5px', color: '#a0aec0', marginTop: '12px', display: 'block' }}>(Bấm vào thẻ để lật xem nghĩa)</span>
+                    </div>
+                  ) : (
+                    <div>
+                      <span style={{ fontSize: '11.5px', textTransform: 'uppercase', color: '#3182ce', letterSpacing: '1px' }}>Phiên âm & Nghĩa</span>
+                      <p style={{ fontSize: '19px', fontWeight: 'bold', color: '#2b6cb0', margin: '6px 0' }}>{entries[currentIndex].pinyin}</p>
+                      <p style={{ fontSize: '16px', color: '#2d3748', margin: '6px 0' }}>{entries[currentIndex].meaning}</p>
+                      {entries[currentIndex].note && (
+                        <p style={{ fontSize: '12.5px', color: '#e53e3e', fontStyle: 'italic', margin: '8px 0 0 0' }}>
+                          Ghi chú: {entries[currentIndex].note}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <button 
+                    onClick={() => { setIsFlipped(false); setCurrentIndex((prev) => (prev > 0 ? prev - 1 : entries.length - 1)); }}
+                    style={styles.modalNavBtn}
+                  >
+                    ⬅ Trước
+                  </button>
+                  <span style={{ fontSize: '13.5px', color: '#4a5568', fontWeight: '600' }}>
+                    {currentIndex + 1} / {entries.length}
+                  </span>
+                  <button 
+                    onClick={() => { setIsFlipped(false); setCurrentIndex((prev) => (prev < entries.length - 1 ? prev + 1 : 0)); }}
+                    style={styles.modalNavBtn}
+                  >
+                    Sau ➡
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <button 
+              onClick={() => setIsFlashcardOpen(false)}
+              style={styles.modalCloseBtn}
+            >
+              Đóng ôn tập
+            </button>
+          </div>
+        </div>
+      )}
+
       {toast && <div style={styles.toast}>{toast}</div>}
-      {loadError && <div style={styles.toastError}>Có sự cố khi lưu — dữ liệu có thể chưa được cập nhật.</div>}
     </div>
   );
 }
 
 const styles = {
-  page: { minHeight: "100vh", background: "linear-gradient(180deg, #0A1428 0%, #0F1B33 60%, #0A1428 100%)", color: "#F0E6D2", fontFamily: "Georgia, 'Noto Serif SC', serif", padding: "28px 16px 60px", position: "relative", overflow: "hidden" },
-  bgRunes: { position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle at 15% 20%, rgba(200,155,60,0.06) 0%, transparent 35%), radial-gradient(circle at 85% 80%, rgba(10,200,185,0.06) 0%, transparent 35%)", pointerEvents: "none" },
+  page: { minHeight: "100vh", color: "#2d3748", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", padding: "28px 16px 60px", position: "relative" },
   header: { maxWidth: 640, margin: "0 auto 22px", textAlign: "center", position: "relative" },
   brandRow: { display: "flex", alignItems: "center", justifyContent: "center", gap: 8 },
-  title: { fontSize: 26, fontWeight: 700, letterSpacing: 1, margin: 0, color: "#F0E6D2", textShadow: "0 0 18px rgba(200,155,60,0.25)" },
-  subtitle: { fontFamily: "Arial, sans-serif", fontSize: 12.5, color: "#8C9AA6", marginTop: 6, letterSpacing: 0.4 },
-  
-  /* Tabs Navigation */
-  tabContainer: { display: "flex", justifyContent: "center", gap: 10, marginTop: 16 },
-  tabBtn: { background: "rgba(20,32,54,0.8)", border: "1px solid #2A3A4C", color: "#8C9AA6", padding: "8px 16px", borderRadius: 20, fontSize: 13, fontFamily: "Arial, sans-serif", fontWeight: 600, cursor: "pointer", transition: "all 0.2s" },
-  tabActive: { background: "rgba(200,155,60,0.15)", border: "1px solid #C89B3C", color: "#F0E6D2", boxShadow: "0 0 12px rgba(200,155,60,0.2)" },
-
-  searchCard: { maxWidth: 640, margin: "0 auto 16px", background: "rgba(20,32,54,0.85)", border: "1px solid #3A4A5C", borderRadius: 4, padding: 14, boxShadow: "0 4px 16px rgba(0,0,0,0.3)" },
-  searchRow: { display: "flex", gap: 8 },
-  searchInput: { flex: 1, background: "#0F1B2E", border: "1px solid #3A4A5C", borderRadius: 3, padding: "11px 12px", color: "#F0E6D2", fontSize: 15, fontFamily: "inherit", outline: "none" },
-  searchBtn: { display: "flex", alignItems: "center", gap: 6, background: "linear-gradient(180deg, #C89B3C, #A9791F)", color: "#0A1428", border: "none", borderRadius: 3, padding: "0 16px", fontWeight: 700, fontSize: 13.5, fontFamily: "Arial, sans-serif", cursor: "pointer" },
+  title: { fontSize: 26, fontWeight: 700, letterSpacing: 1, margin: 0, color: "#1a202c", textShadow: "0 2px 4px rgba(255,255,255,0.8)" },
+  subtitle: { fontSize: 12.5, color: "#4a5568", marginTop: 6, letterSpacing: 0.4, fontWeight: 600, textShadow: "0 1px 2px rgba(255,255,255,0.8)" },
+  searchCard: { maxWidth: 640, margin: "0 auto 18px", background: "rgba(255, 255, 255, 0.9)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.6)", borderRadius: 8, padding: 14, boxShadow: "0 4px 20px rgba(0, 0, 0, 0.08)" },
+  searchRow: { display: "flex", gap: 8, flexWrap: "wrap" },
+  searchInput: { flex: 1, minWidth: 160, background: "#fff", border: "1px solid #cbd5e0", borderRadius: 4, padding: "11px 12px", color: "#2d3748", fontSize: 15, fontFamily: "inherit", outline: "none" },
+  searchBtn: { display: "flex", alignItems: "center", gap: 6, background: "#3182ce", color: "#fff", border: "none", borderRadius: 4, padding: "0 16px", fontWeight: 700, fontSize: 13.5, cursor: "pointer", boxShadow: "0 2px 8px rgba(49, 130, 206, 0.3)" },
+  flashcardHeaderBtn: { display: "flex", alignItems: "center", gap: 6, background: "#38a169", color: "#fff", border: "none", borderRadius: 4, padding: "0 16px", fontWeight: 700, fontSize: 13.5, cursor: "pointer", boxShadow: "0 2px 8px rgba(56, 161, 105, 0.3)" },
   errorRow: { display: "flex", alignItems: "center", gap: 6, marginTop: 8 },
   
-  /* KHUNG TRẮNG KẾT QUẢ TÌM KIẾM (#FFFFFF) */
-  whiteResultBox: { marginTop: 14, background: "#FFFFFF", color: "#0A1428", borderRadius: 6, padding: 16, border: "2px solid #C89B3C", boxShadow: "0 6px 20px rgba(0,0,0,0.4)" },
-  whiteResultHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, paddingBottom: 6, borderBottom: "1px solid #E2E8F0" },
-  whiteResultTitle: { fontSize: 12, fontWeight: 700, color: "#C89B3C", fontFamily: "Arial, sans-serif", letterSpacing: 0.5 },
-  whiteCloseBtn: { background: "transparent", border: "none", color: "#718096", cursor: "pointer", fontSize: 15, padding: "0 4px", fontWeight: "bold" },
-  whiteResultBody: { display: "flex", flexDirection: "column", gap: 8 },
-  whiteWordRow: { display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" },
-  whiteWord: { fontSize: 32, fontWeight: 700, color: "#0A1428" },
-  whitePinyin: { fontSize: 16, color: "#008080", fontFamily: "Arial, sans-serif", fontWeight: 600 },
-  whiteCategoryBadge: { fontSize: 11.5, background: "#EDF2F7", color: "#2B6CB0", border: "1px solid #CBD5E0", padding: "3px 10px", borderRadius: 12, fontFamily: "Arial, sans-serif", fontWeight: 600 },
-  whiteMeaning: { fontSize: 15, color: "#2D3748", margin: 0, lineHeight: 1.5, fontFamily: "Arial, sans-serif" },
-  whiteNote: { fontSize: 13.5, color: "#4A5568", margin: 0, fontFamily: "Arial, sans-serif", fontStyle: "italic" },
-  autoSaveBadge: { marginTop: 8, fontSize: 12.5, color: "#234E52", fontFamily: "Arial, sans-serif", background: "#E6FFFA", border: "1px solid #B2F5EA", padding: "8px 12px", borderRadius: 4, display: "flex", alignItems: "center" },
+  latestResultCard: { maxWidth: 640, margin: "0 auto 18px", background: "rgba(255, 255, 255, 0.95)", backdropFilter: "blur(8px)", border: "2px solid #3182ce", borderRadius: 8, padding: "16px 18px", boxShadow: "0 4px 20px rgba(49, 130, 206, 0.15)" },
+  latestResultHeader: { display: "flex", justifyContent: "space-between", alignItems: "center" },
+  latestResultBadge: { fontSize: "11.5px", textTransform: "uppercase", fontWeight: "700", color: "#3182ce", letterSpacing: "0.5px" },
+  latestResultClose: { background: "transparent", border: "none", fontSize: "15px", color: "#718096", cursor: "pointer", fontWeight: "bold" },
 
   listHeader: { maxWidth: 640, margin: "0 auto 10px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 },
   listHeaderLeft: { display: "flex", alignItems: "center", gap: 6 },
-  listCount: { fontFamily: "Arial, sans-serif", fontSize: 12.5, color: "#8C9AA6", letterSpacing: 0.3 },
+  listCount: { fontSize: 12.5, color: "#2d3748", fontWeight: 600, letterSpacing: 0.3, textShadow: "0 1px 2px rgba(255,255,255,0.8)" },
   filterRow: { display: "flex", gap: 8 },
-  filterInput: { background: "#0F1B2E", border: "1px solid #3A4A5C", borderRadius: 3, padding: "7px 10px", color: "#F0E6D2", fontSize: 13, fontFamily: "inherit", outline: "none", width: 160 },
-  addBtn: { display: "flex", alignItems: "center", gap: 5, background: "transparent", border: "1px solid #0AC8B9", color: "#0AC8B9", borderRadius: 3, padding: "7px 12px", fontSize: 12.5, fontFamily: "Arial, sans-serif", fontWeight: 600, cursor: "pointer" },
-  manualCard: { maxWidth: 640, margin: "0 auto 16px", background: "rgba(20,32,54,0.75)", border: "1px solid #0AC8B9", borderRadius: 4, padding: 14 },
+  filterInput: { background: "rgba(255,255,255,0.9)", border: "1px solid #cbd5e0", borderRadius: 4, padding: "7px 10px", color: "#2d3748", fontSize: 13, fontFamily: "inherit", outline: "none", width: 160 },
+  addBtn: { display: "flex", alignItems: "center", gap: 5, background: "rgba(255,255,255,0.9)", border: "1px solid #cbd5e0", color: "#2b6cb0", borderRadius: 4, padding: "7px 12px", fontSize: 12.5, fontWeight: 600, cursor: "pointer" },
+  manualCard: { maxWidth: 640, margin: "0 auto 16px", background: "rgba(255, 255, 255, 0.95)", border: "1px solid #cbd5e0", borderRadius: 8, padding: 14, boxShadow: "0 4px 15px rgba(0, 0, 0, 0.1)" },
   manualGrid: { display: "flex", gap: 8 },
-  manualInput: { flex: 1, background: "#0F1B2E", border: "1px solid #3A4A5C", borderRadius: 3, padding: "9px 10px", color: "#F0E6D2", fontSize: 13.5, fontFamily: "inherit", outline: "none" },
-  saveBtn: { display: "flex", alignItems: "center", gap: 5, background: "#0AC8B9", color: "#0A1428", border: "none", borderRadius: 3, padding: "7px 14px", fontWeight: 700, fontSize: 12.5, fontFamily: "Arial, sans-serif", cursor: "pointer" },
-  cancelBtn: { display: "flex", alignItems: "center", gap: 5, background: "transparent", color: "#8C9AA6", border: "1px solid #3A4A5C", borderRadius: 3, padding: "7px 14px", fontSize: 12.5, fontFamily: "Arial, sans-serif", cursor: "pointer" },
+  manualInput: { flex: 1, background: "#fff", border: "1px solid #cbd5e0", borderRadius: 4, padding: "9px 10px", color: "#2d3748", fontSize: 13.5, fontFamily: "inherit", outline: "none" },
+  saveBtn: { display: "flex", alignItems: "center", gap: 5, background: "#3182ce", color: "#fff", border: "none", borderRadius: 4, padding: "7px 14px", fontWeight: 700, fontSize: 12.5, cursor: "pointer" },
+  cancelBtn: { display: "flex", alignItems: "center", gap: 5, background: "transparent", color: "#4a5568", border: "1px solid #cbd5e0", borderRadius: 4, padding: "7px 14px", fontSize: 12.5, cursor: "pointer" },
   list: { maxWidth: 640, margin: "0 auto", display: "flex", flexDirection: "column", gap: 14 },
-  folder: { border: "1px solid #2A3A4C", borderRadius: 4, overflow: "hidden" },
-  folderHeader: { display: "flex", alignItems: "center", gap: 8, background: "rgba(200,155,60,0.08)", padding: "10px 12px", cursor: "pointer", userSelect: "none" },
-  folderArrow: { fontSize: 10, color: "#C89B3C" },
-  folderName: { fontSize: 14, fontWeight: 700, color: "#C89B3C", flex: 1, fontFamily: "Arial, sans-serif" },
-  folderCount: { fontSize: 11.5, color: "#8C9AA6", fontFamily: "Arial, sans-serif", background: "rgba(255,255,255,0.06)", padding: "2px 8px", borderRadius: 10 },
+  folder: { border: "1px solid rgba(255,255,255,0.6)", borderRadius: 8, overflow: "hidden", background: "rgba(255, 255, 255, 0.8)", backdropFilter: "blur(5px)" },
+  folderHeader: { display: "flex", alignItems: "center", gap: 8, background: "rgba(255, 255, 255, 0.9)", padding: "10px 12px", cursor: "pointer", userSelect: "none" },
+  folderArrow: { fontSize: 10, color: "#3182ce" },
+  folderName: { fontSize: 14, fontWeight: 700, color: "#2b6cb0", flex: 1 },
+  folderCount: { fontSize: 11.5, color: "#4a5568", background: "rgba(237, 242, 247, 0.8)", padding: "2px 8px", borderRadius: 10 },
   folderBody: { display: "flex", flexDirection: "column", gap: 8, padding: 10 },
-  emptyState: { textAlign: "center", color: "#6B7B8C", fontSize: 13.5, fontFamily: "Arial, sans-serif", padding: "30px 10px", border: "1px dashed #2A3A4C", borderRadius: 4 },
-  card: { background: "rgba(20,32,54,0.6)", border: "1px solid #2A3A4C", borderLeft: "3px solid #C89B3C", borderRadius: 3, padding: "13px 14px" },
+  emptyState: { textAlign: "center", color: "#2d3748", fontWeight: 600, fontSize: 13.5, padding: "30px 10px", border: "1px dashed rgba(255,255,255,0.8)", borderRadius: 8, background: "rgba(255,255,255,0.7)", textShadow: "0 1px 2px rgba(255,255,255,0.8)" },
+  card: { background: "rgba(255, 255, 255, 0.92)", border: "1px solid #e2e8f0", borderLeft: "3px solid #3182ce", borderRadius: 6, padding: "13px 14px", boxShadow: "0 2px 10px rgba(0,0,0,0.04)" },
   cardTop: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" },
-  word: { fontSize: 20, fontWeight: 700, marginRight: 10, color: "#F0E6D2" },
-  pinyin: { fontSize: 13.5, color: "#0AC8B9", fontFamily: "Arial, sans-serif" },
-  meaning: { margin: "6px 0 2px", fontSize: 14.5, color: "#E5DBC4", lineHeight: 1.5 },
-  note: { margin: "4px 0 0", fontSize: 12.5, color: "#8C9AA6", fontFamily: "Arial, sans-serif", lineHeight: 1.4, fontStyle: "italic" },
-  inlineInput: { background: "#0F1B2E", border: "1px solid #3A4A5C", borderRadius: 3, padding: "5px 8px", color: "#F0E6D2", fontSize: 13, fontFamily: "inherit", outline: "none" },
-  iconBtn: { background: "transparent", border: "1px solid #3A4A5C", color: "#8C9AA6", borderRadius: 3, padding: "6px 9px", cursor: "pointer" },
-  iconBtnGood: { background: "#0AC8B9", border: "none", color: "#0A1428", borderRadius: 3, padding: "6px 9px", cursor: "pointer" },
-  iconBtnBad: { background: "transparent", border: "1px solid #5C2A2A", color: "#E84057", borderRadius: 3, padding: "6px 9px", cursor: "pointer" },
-
-  /* Flashcard Styles */
-  flashcardContainer: { maxWidth: 640, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 },
-  fcControlsTop: { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 },
-  fcFilterGroup: { display: "flex", alignItems: "center", gap: 8 },
-  fcLabel: { fontSize: 13, fontFamily: "Arial, sans-serif", color: "#8C9AA6" },
-  fcSelect: { background: "#0F1B2E", border: "1px solid #3A4A5C", color: "#F0E6D2", borderRadius: 3, padding: "6px 10px", fontSize: 13, outline: "none" },
-  fcShuffleBtn: { background: "transparent", border: "1px solid #C89B3C", color: "#C89B3C", borderRadius: 3, padding: "6px 12px", fontSize: 12.5, fontFamily: "Arial, sans-serif", cursor: "pointer" },
-  fcCard: { minHeight: 260, background: "rgba(20,32,54,0.9)", border: "2px solid #C89B3C", borderRadius: 8, padding: 20, display: "flex", flexDirection: "column", justifyContent: "space-between", position: "relative", cursor: "pointer", transition: "all 0.3s ease", userSelect: "none" },
-  fcCardCategory: { fontSize: 12, color: "#C89B3C", fontFamily: "Arial, sans-serif", textTransform: "uppercase", letterSpacing: 0.5 },
-  fcCardMain: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, margin: "20px 0", textAlign: "center" },
-  fcWord: { fontSize: 42, fontWeight: 700, color: "#F0E6D2", letterSpacing: 2 },
-  fcHint: { marginTop: 18, fontSize: 13, color: "#8C9AA6", fontFamily: "Arial, sans-serif", fontStyle: "italic" },
-  fcFlippedContent: { marginTop: 16, display: "flex", flexDirection: "column", gap: 6, alignItems: "center" },
-  fcPinyin: { fontSize: 18, color: "#0AC8B9", fontFamily: "Arial, sans-serif", fontWeight: 600 },
-  fcMeaning: { fontSize: 18, color: "#F0E6D2", lineHeight: 1.4 },
-  fcNote: { fontSize: 13.5, color: "#A0B0C0", fontFamily: "Arial, sans-serif", fontStyle: "italic", marginTop: 4 },
-  fcProgress: { textAlign: "right", fontSize: 12, color: "#8C9AA6", fontFamily: "Arial, sans-serif" },
-  fcControlsBottom: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 },
-  fcNavBtn: { flex: 1, background: "rgba(20,32,54,0.8)", border: "1px solid #3A4A5C", color: "#F0E6D2", borderRadius: 4, padding: "10px", fontSize: 13.5, fontFamily: "Arial, sans-serif", cursor: "pointer" },
-  fcFlipBtn: { flex: 2, background: "linear-gradient(180deg, #C89B3C, #A9791F)", color: "#0A1428", border: "none", borderRadius: 4, padding: "10px", fontSize: 14, fontWeight: 700, fontFamily: "Arial, sans-serif", cursor: "pointer" },
-
-  toast: { position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)", background: "#0AC8B9", color: "#0A1428", padding: "9px 18px", borderRadius: 4, fontSize: 13, fontWeight: 600, fontFamily: "Arial, sans-serif", boxShadow: "0 4px 20px rgba(0,0,0,0.4)" },
-  toastError: { position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)", background: "#E84057", color: "#0A1428", padding: "9px 18px", borderRadius: 4, fontSize: 13, fontWeight: 600, fontFamily: "Arial, sans-serif" },
+  word: { fontSize: 20, fontWeight: 700, marginRight: 10, color: "#1a202c" },
+  pinyin: { fontSize: 13.5, color: "#3182ce", fontWeight: 600 },
+  meaning: { margin: "6px 0 2px", fontSize: 14.5, color: "#2d3748", lineHeight: 1.5 },
+  note: { margin: "4px 0 0", fontSize: 12.5, color: "#718096", lineHeight: 1.4, fontStyle: "italic" },
+  inlineInput: { background: "#fff", border: "1px solid #cbd5e0", borderRadius: 4, padding: "5px 8px", color: "#2d3748", fontSize: 13, fontFamily: "inherit", outline: "none" },
+  iconBtn: { background: "transparent", border: "1px solid #cbd5e0", color: "#4a5568", borderRadius: 4, padding: "6px 9px", cursor: "pointer" },
+  iconBtnGood: { background: "#3182ce", border: "none", color: "#fff", borderRadius: 4, padding: "6px 9px", cursor: "pointer" },
+  iconBtnBad: { background: "transparent", border: "1px solid #e53e3e", color: "#e53e3e", borderRadius: 4, padding: "6px 9px", cursor: "pointer" },
+  modalOverlay: { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 },
+  modalCard: { background: 'white', padding: '24px', borderRadius: '12px', width: '420px', maxWidth: '90%', textAlign: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' },
+  flashcardBox: { border: '2px solid #e2e8f0', borderRadius: '10px', padding: '36px 20px', minHeight: '150px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', backgroundColor: '#f7fafc', margin: '10px 0 20px 0', userSelect: 'none' },
+  modalNavBtn: { padding: '6px 14px', background: '#edf2f7', color: '#333', border: '1px solid #cbd5e0', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 },
+  modalCloseBtn: { width: '100%', padding: '10px', background: '#e53e3e', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 700, cursor: 'pointer' },
+  toast: { position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)", background: "#3182ce", color: "#fff", padding: "9px 18px", borderRadius: 6, fontSize: 13, fontWeight: 600, boxShadow: "0 4px 20px rgba(49, 130, 206, 0.4)" },
 };
 
 ReactDOM.createRoot(document.getElementById("root")).render(<LolDictionary />);
