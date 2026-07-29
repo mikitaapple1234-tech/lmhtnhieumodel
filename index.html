@@ -11,10 +11,11 @@
   body {
     margin: 0;
     overflow-x: hidden;
-    background-image: url('https://www.bing.com/images/search?view=detailV2&ccid=UmR16B6b&id=05140526B81D9F7A276145E81BF0E6A83E5D1FC4&thid=OIP.UmR16B6bA9mF2M_ziqGfrgHaLH&mediaurl=https%3A%2F%2Fimage.xportsnews.com%2Fcontents%2Fimages%2Fupload%2Farticle%2F2024%2F0118%2F1705566127551816.jpg&cdnurl=https%3A%2F%2Fth.bing.com%2Fth%2Fid%2FR.526475e81e9b03d985d8cff38aa19fae%3Frik%3DxB9dPqjm8BvoRQ%26pid%3DImgRaw%26r%3D0&exph=1800&expw=1200&q=%EC%BC%88%EB%A6%B0&ck=F2372AD4B22BF643C1143ED8AE4476F7&selectedIndex=4&itb=0&cw=1341&ch=666&ajaxhist=0&ajaxserp=0&shtc=0&shth=OIP.UmR16B6bA9mF2M_ziqGfrgHaLH&shsc=idp&form=EX0050&shid=60d37bc2-5497-47f0-8fb3-a93ab7f59ab3&shtp=GetUrl&shtk=J%2By8iOumsCcg6rmA7ZiV6recLCDsg4gg7Iuc7KaMIOyLrOq4sOydvOyghFvtj6zthqBd&shdk=VMOsbSB0aOG6pXkgdHLDqm4gQmluZyB04burIHd3dy54cG9ydHNuZXdzLmNvbQ%3D%3D&shhk=FYljh893283N3dE6KXc9qFRqjFwfHaBWmBfXFo5UBnU%3D');
+    background-image: url('https://image.xportsnews.com/contents/images/upload/article/2024/0118/1705566127551816.jpg');
     background-position: center;
     background-attachment: fixed;
     background-repeat: no-repeat;
+    background-size: cover;
   }
 </style>
 </head>
@@ -270,7 +271,7 @@ function LolDictionary() {
             <span style={styles.latestResultBadge}>✨ Kết quả tra cứu gần nhất</span>
             <button onClick={() => setLatestResult(null)} style={styles.latestResultClose}>✕</button>
           </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginTop: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginTop: '6px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '28px', fontWeight: '700', color: '#1a202c' }}>{latestResult.word}</span>
             <span style={{ fontSize: '15px', fontWeight: '600', color: '#3182ce' }}>{latestResult.pinyin}</span>
             <span style={{ fontSize: '12px', background: '#edf2f7', padding: '2px 8px', borderRadius: '10px', color: '#4a5568' }}>📁 {latestResult.category}</span>
