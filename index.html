@@ -36,7 +36,7 @@ function LolDictionary() {
   const [filter, setFilter] = useState("");
   const [looking, setLooking] = useState(false);
   const [lookupError, setLookupError] = useState("");
-  const [searchResult, setSearchResult] = useState(null); // Khung kết quả tìm kiếm
+  const [searchResult, setSearchResult] = useState(null); // Từ vừa tìm kiếm hiển thị ở khung trắng
   const [editingId, setEditingId] = useState(null);
   const [editDraft, setEditDraft] = useState({ pinyin: "", meaning: "", note: "", category: CATEGORIES[CATEGORIES.length - 1] });
   const [manualOpen, setManualOpen] = useState(false);
@@ -112,18 +112,18 @@ function LolDictionary() {
         next = [newEntry, ...entries];
       }
 
-      // 1. Tự động lưu vào thư mục / LocalStorage
+      // 1. Tự động thêm từ đó vào thư mục / bộ nhớ LocalStorage
       persist(next);
 
-      // 2. Hiện kết quả trực tiếp trong khung kết quả tìm kiếm
+      // 2. Hiển thị từ vừa tìm kiếm vào KHUNG TRẮNG
       setSearchResult(newEntry);
 
-      // 3. Tự động mở thư mục chứa từ đó ở danh sách bên dưới
+      // 3. Tự động mở thư mục tương ứng ở bên dưới
       if (newEntry.category) {
         setClosedFolders((prev) => ({ ...prev, [newEntry.category]: false }));
       }
 
-      showToast(existingIdx >= 0 ? "Đã cập nhật từ vào thư mục!" : "Đã tự động lưu vào thư mục!");
+      showToast(existingIdx >= 0 ? "Đã cập nhật từ vào thư mục!" : "Đã tự động thêm vào thư mục!");
     } catch (e) {
       setLookupError(e.message || "Không tra cứu được từ này. Thử lại nhé.");
     } finally {
@@ -182,10 +182,10 @@ function LolDictionary() {
     }
     setManualDraft({ word: "", pinyin: "", meaning: "", note: "", category: CATEGORIES[CATEGORIES.length - 1] });
     setManualOpen(false);
-    showToast("Đã thêm & lưu từ mới");
+    showToast("Đã thêm & tự động lưu từ mới");
   }
 
-  // Lọc từ cho Chế độ Từ điển
+  // Lọc danh sách từ
   const filtered = entries.filter((e) => {
     const q = filter.trim().toLowerCase();
     if (!q) return true;
@@ -202,7 +202,7 @@ function LolDictionary() {
     items: filtered.filter((e) => (e.category || "Từ vựng chung") === cat),
   })).filter((g) => g.items.length > 0);
 
-  // Danh sách từ cho Chế độ Flashcard
+  // Danh sách cho Flashcard
   const fcPool = fcCategory === "Tất cả"
     ? entries
     : entries.filter((e) => (e.category || "Từ vựng chung") === fcCategory);
@@ -241,7 +241,7 @@ function LolDictionary() {
         </div>
         <p style={styles.subtitle}>Từ điển Hán ngữ · thuật ngữ Liên Minh Huyền Thoại</p>
         
-        {/* Tab chuyển đổi Từ điển <-> Flashcards */}
+        {/* Tab chuyển đổi giữa Từ điển & Flashcard */}
         <div style={styles.tabContainer}>
           <button
             style={{ ...styles.tabBtn, ...(activeTab === "dictionary" ? styles.tabActive : {}) }}
@@ -262,10 +262,10 @@ function LolDictionary() {
         </div>
       </header>
 
-      {/* CHẾ ĐỘ 1: TỪ ĐIỂN & TRA CỨU */}
+      {/* CHẾ ĐỘ 1: TÌM KIẾM VÀ TỪ ĐIỂN */}
       {activeTab === "dictionary" && (
         <>
-          {/* KHUNG TÌM KIẾM TÍCH HỢP KHUNG KẾT QUẢ TRỰC TIẾP */}
+          {/* KHU VỰC TÌM KIẾM */}
           <section style={styles.searchCard}>
             <div style={styles.searchRow}>
               <input
@@ -285,43 +285,44 @@ function LolDictionary() {
             </div>
             {lookupError && <div style={styles.errorRow}>⚠ <span style={{ color: "#E84057", fontSize: 13 }}>{lookupError}</span></div>}
 
-            {/* KHUNG KẾT QUẢ TÌM KIẾM (HIỆN NGHĨA, PINYIN & BÁO TỰ ĐỘNG LƯU) */}
+            {/* KHUNG TRẮNG HIỂN THỊ TỪ VỪA TÌM KIẾM */}
             {searchResult && (
-              <div style={styles.searchResultBox}>
-                <div style={styles.resultHeader}>
-                  <span style={styles.resultTitle}>📌 KẾT QUẢ TÌM KIẾM:</span>
-                  <button style={styles.closeResultBtn} onClick={() => setSearchResult(null)} title="Đóng khung">✕</button>
+              <div style={styles.whiteResultBox}>
+                <div style={styles.whiteResultHeader}>
+                  <span style={styles.whiteResultTitle}>📌 TỪ VỪA TÌM KIẾM</span>
+                  <button style={styles.whiteCloseBtn} onClick={() => setSearchResult(null)} title="Đóng khung">✕</button>
                 </div>
                 
-                <div style={styles.resultMain}>
-                  <div style={styles.resultTopRow}>
-                    <span style={styles.resultWord}>{searchResult.word}</span>
-                    <span style={styles.resultPinyin}>{searchResult.pinyin}</span>
-                    <span style={styles.resultBadge}>📁 {searchResult.category}</span>
+                <div style={styles.whiteResultBody}>
+                  <div style={styles.whiteWordRow}>
+                    <span style={styles.whiteWord}>{searchResult.word}</span>
+                    <span style={styles.whitePinyin}>{searchResult.pinyin}</span>
+                    <span style={styles.whiteCategoryBadge}>📁 {searchResult.category}</span>
                   </div>
 
-                  <p style={styles.resultMeaning}>
-                    <strong style={{ color: "#C89B3C" }}>Nghĩa:</strong> {searchResult.meaning}
-                  </p>
+                  <div style={styles.whiteMeaning}>
+                    <strong>Nghĩa:</strong> {searchResult.meaning}
+                  </div>
 
                   {searchResult.note && (
-                    <p style={styles.resultNote}>
-                      <strong style={{ color: "#8C9AA6" }}>Ghi chú:</strong> {searchResult.note}
-                    </p>
+                    <div style={styles.whiteNote}>
+                      <strong>Ghi chú:</strong> {searchResult.note}
+                    </div>
                   )}
 
-                  <div style={styles.autoSaveNotice}>
-                    ✓ Đã tự động lưu từ này vào thư mục <strong style={{ color: "#F0E6D2" }}>"{searchResult.category}"</strong>
+                  {/* BÁO TỰ ĐỘNG LƯU VÀO THƯ MỤC */}
+                  <div style={styles.autoSaveBadge}>
+                    ✓ Đã tự động thêm từ này vào thư mục <strong>"{searchResult.category}"</strong>
                   </div>
                 </div>
               </div>
             )}
           </section>
 
-          {/* Header danh sách từ vựng */}
+          {/* Header danh sách các thư mục */}
           <section style={styles.listHeader}>
             <div style={styles.listHeaderLeft}>
-              <span style={styles.listCount}>📖 {entries.length} mục từ trong từ điển</span>
+              <span style={styles.listCount}>📖 {entries.length} mục từ đã được lưu</span>
             </div>
             <div style={styles.filterRow}>
               <input
@@ -334,7 +335,7 @@ function LolDictionary() {
             </div>
           </section>
 
-          {/* Form thêm thủ công */}
+          {/* Form thêm từ thủ công */}
           {manualOpen && (
             <section style={styles.manualCard}>
               <div style={styles.manualGrid}>
@@ -353,7 +354,7 @@ function LolDictionary() {
             </section>
           )}
 
-          {/* Danh sách các Thư mục từ vựng đã tự động lưu */}
+          {/* Danh sách các Thư mục từ vựng đã tự động thêm */}
           <main style={styles.list}>
             {!loaded && <div style={styles.emptyState}>Đang tải từ điển…</div>}
             {loaded && entries.length === 0 && (
@@ -425,7 +426,7 @@ function LolDictionary() {
         </>
       )}
 
-      {/* CHẾ ĐỘ 2: FLASHCARD / THẺ GHI NHỚ */}
+      {/* CHẾ ĐỘ 2: FLASHCARDS (THẺ GHI NHỚ) */}
       {activeTab === "flashcard" && (
         <section style={styles.flashcardContainer}>
           <div style={styles.fcControlsTop}>
@@ -526,19 +527,19 @@ const styles = {
   searchBtn: { display: "flex", alignItems: "center", gap: 6, background: "linear-gradient(180deg, #C89B3C, #A9791F)", color: "#0A1428", border: "none", borderRadius: 3, padding: "0 16px", fontWeight: 700, fontSize: 13.5, fontFamily: "Arial, sans-serif", cursor: "pointer" },
   errorRow: { display: "flex", alignItems: "center", gap: 6, marginTop: 8 },
   
-  /* Khung Kết Quả Tìm Kiếm Tích Hợp */
-  searchResultBox: { marginTop: 14, background: "rgba(10, 200, 185, 0.08)", border: "1px solid #0AC8B9", borderRadius: 4, padding: 12 },
-  resultHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, paddingBottom: 6, borderBottom: "1px solid rgba(10, 200, 185, 0.2)" },
-  resultTitle: { fontSize: 12, fontWeight: 700, color: "#0AC8B9", fontFamily: "Arial, sans-serif", letterSpacing: 0.5 },
-  closeResultBtn: { background: "transparent", border: "none", color: "#8C9AA6", cursor: "pointer", fontSize: 14, padding: "0 4px" },
-  resultMain: { display: "flex", flexDirection: "column", gap: 6 },
-  resultTopRow: { display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" },
-  resultWord: { fontSize: 26, fontWeight: 700, color: "#F0E6D2" },
-  resultPinyin: { fontSize: 15, color: "#0AC8B9", fontFamily: "Arial, sans-serif", fontWeight: 600 },
-  resultBadge: { fontSize: 11.5, background: "rgba(200, 155, 60, 0.2)", color: "#C89B3C", padding: "2px 8px", borderRadius: 10, fontFamily: "Arial, sans-serif" },
-  resultMeaning: { fontSize: 15, color: "#E5DBC4", margin: "2px 0 0", lineHeight: 1.5 },
-  resultNote: { fontSize: 13, color: "#A0B0C0", margin: "0", fontFamily: "Arial, sans-serif", fontStyle: "italic" },
-  autoSaveNotice: { marginTop: 8, fontSize: 12, color: "#0AC8B9", fontFamily: "Arial, sans-serif", background: "rgba(10, 200, 185, 0.12)", padding: "6px 10px", borderRadius: 3, display: "flex", alignItems: "center" },
+  /* KHUNG TRẮNG KẾT QUẢ TÌM KIẾM (#FFFFFF) */
+  whiteResultBox: { marginTop: 14, background: "#FFFFFF", color: "#0A1428", borderRadius: 6, padding: 16, border: "2px solid #C89B3C", boxShadow: "0 6px 20px rgba(0,0,0,0.4)" },
+  whiteResultHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, paddingBottom: 6, borderBottom: "1px solid #E2E8F0" },
+  whiteResultTitle: { fontSize: 12, fontWeight: 700, color: "#C89B3C", fontFamily: "Arial, sans-serif", letterSpacing: 0.5 },
+  whiteCloseBtn: { background: "transparent", border: "none", color: "#718096", cursor: "pointer", fontSize: 15, padding: "0 4px", fontWeight: "bold" },
+  whiteResultBody: { display: "flex", flexDirection: "column", gap: 8 },
+  whiteWordRow: { display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" },
+  whiteWord: { fontSize: 32, fontWeight: 700, color: "#0A1428" },
+  whitePinyin: { fontSize: 16, color: "#008080", fontFamily: "Arial, sans-serif", fontWeight: 600 },
+  whiteCategoryBadge: { fontSize: 11.5, background: "#EDF2F7", color: "#2B6CB0", border: "1px solid #CBD5E0", padding: "3px 10px", borderRadius: 12, fontFamily: "Arial, sans-serif", fontWeight: 600 },
+  whiteMeaning: { fontSize: 15, color: "#2D3748", margin: 0, lineHeight: 1.5, fontFamily: "Arial, sans-serif" },
+  whiteNote: { fontSize: 13.5, color: "#4A5568", margin: 0, fontFamily: "Arial, sans-serif", fontStyle: "italic" },
+  autoSaveBadge: { marginTop: 8, fontSize: 12.5, color: "#234E52", fontFamily: "Arial, sans-serif", background: "#E6FFFA", border: "1px solid #B2F5EA", padding: "8px 12px", borderRadius: 4, display: "flex", alignItems: "center" },
 
   listHeader: { maxWidth: 640, margin: "0 auto 10px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 },
   listHeaderLeft: { display: "flex", alignItems: "center", gap: 6 },
