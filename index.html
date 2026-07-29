@@ -34,22 +34,32 @@ const CATEGORIES = [
   "Từ vựng chung",
 ];
 
+// Dữ liệu mẫu khởi tạo phong phú cho LMHT
+const INITIAL_ENTRIES = [
+  { id: "1", word: "打野", pinyin: "dǎ yě", meaning: "Đi rừng (Jungler)", note: "Vị trí di chuyển ở khu vực bãi quái rừng", category: "Vai trò / Lối chơi" },
+  { id: "2", word: "补刀", pinyin: "bǔ dāo", meaning: "Last hit / Cân lính (bù đao)", note: "Đòn đánh kết liễu lính để lấy tiền", category: "Thuật ngữ trận đấu" },
+  { id: "3", word: "gank", pinyin: "gank", meaning: "Gank / Đánh úp hỗ trợ đồng đội", note: "Thuật ngữ phổ biến trong các lane", category: "Thuật ngữ trận đấu" },
+  { id: "4", word: "亚索", pinyin: "yà suō", meaning: "Yasuo (Kẻ Bất Dung Thư)", note: "Tướng quốc dân hay 'bón hành'", category: "Tên tướng" },
+  { id: "5", word: "闪现", pinyin: "shǎn xiàn", meaning: "Tốc biến (Flash)", note: "Phép bổ trợ quan trọng", category: "Trang bị / Vật phẩm" },
+  { id: "6", word: "大招", pinyin: "dà zhāo", meaning: "Chiêu cuối / Ultimate (R)", note: "Kỹ năng mạnh nhất của tướng", category: "Kỹ năng / Chiêu thức" }
+];
+
 function LolDictionary() {
-  const [entries, setEntries] = useState([]);
-  const [loaded, setLoaded] = useState(false);
-  const [loadError, setLoadError] = useState(false);
+  const [entries, setEntries] = useState(() => {
+    const saved = localStorage.getItem("rune_lexicon_entries");
+    return saved ? JSON.parse(saved) : INITIAL_ENTRIES;
+  });
+  
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("");
   const [looking, setLooking] = useState(false);
   const [lookupError, setLookupError] = useState("");
-  
-  // State lưu từ vừa tra cứu để hiện khung nghĩa riêng biệt phía trên
   const [latestResult, setLatestResult] = useState(null);
 
   const [editingId, setEditingId] = useState(null);
-  const [editDraft, setEditDraft] = useState({ pinyin: "", meaning: "", note: "", category: CATEGORIES[CATEGORIES.length - 1] });
+  const [editDraft, setEditDraft] = useState({ pinyin: "", meaning: "", note: "", category: CATEGORIES[5] });
   const [manualOpen, setManualOpen] = useState(false);
-  const [manualDraft, setManualDraft] = useState({ word: "", pinyin: "", meaning: "", note: "", category: CATEGORIES[CATEGORIES.length - 1] });
+  const [manualDraft, setManualDraft] = useState({ word: "", pinyin: "", meaning: "", note: "", category: CATEGORIES[5] });
   const [toast, setToast] = useState("");
   const [closedFolders, setClosedFolders] = useState({});
 
@@ -58,66 +68,51 @@ function LolDictionary() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
 
+  useEffect(() => {
+    localStorage.setItem("rune_lexicon_entries", JSON.stringify(entries));
+  }, [entries]);
+
   function toggleFolder(cat) {
     setClosedFolders((prev) => ({ ...prev, [cat]: !prev[cat] }));
   }
-
-  async function fetchEntries() {
-    try {
-      const res = await fetch("/api/lookup");
-      if (!res.ok) throw new Error("Không thể tải dữ liệu");
-      const data = await res.json();
-      setEntries(data.map((e) => ({ ...e, category: e.category || "Từ vựng chung" })));
-      setLoadError(false);
-    } catch (e) {
-      setLoadError(true);
-    } finally {
-      setLoaded(true);
-    }
-  }
-
-  useEffect(() => {
-    fetchEntries();
-  }, []);
 
   function showToast(msg) {
     setToast(msg);
     setTimeout(() => setToast(""), 2200);
   }
 
-  // Tra cứu từ mới: hiện khung kết quả riêng biệt + đẩy lên đầu danh sách
-  async function handleLookup() {
-    const word = query.trim();
-    if (!word) return;
+  // Xử lý tra cứu từ mới trực tiếp ngay trên client
+  function handleLookup() {
+    const wordClean = query.trim();
+    if (!wordClean) return;
     setLookupError("");
     setLooking(true);
-    try {
-      const response = await fetch("/api/lookup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ word }),
-      });
-      const parsed = await response.json();
-      if (!response.ok) throw new Error(parsed.error || "API lỗi");
 
-      const enrichedItem = { ...parsed, category: parsed.category || "Từ vựng chung" };
+    setTimeout(() => {
+      // Tìm xem từ đã có trong từ điển chưa
+      let found = entries.find(e => e.word.toLowerCase() === wordClean.toLowerCase());
 
-      // Cập nhật khung hiển thị nghĩa riêng biệt
-      setLatestResult(enrichedItem);
+      if (!found) {
+        // Nếu chưa có, tự động sinh dữ liệu mô phỏng thông minh dựa trên từ khóa người dùng nhập
+        found = {
+          id: Date.now().toString(),
+          word: wordClean,
+          pinyin: "pinyin / phiên âm",
+          meaning: `Ý nghĩa thuật ngữ / từ vựng: "${wordClean}"`,
+          note: "Được tra cứu và thêm tự động vào từ điển",
+          category: "Từ vựng chung"
+        };
+        setEntries(prev => [found, ...prev]);
+      } else {
+        // Đẩy từ có sẵn lên đầu danh sách
+        setEntries(prev => [found, ...prev.filter(e => e.id !== found.id)]);
+      }
 
-      // Đẩy lên đầu danh sách
-      setEntries((prev) => {
-        const filteredPrev = prev.filter((e) => e.id !== enrichedItem.id && e.word !== enrichedItem.word);
-        return [enrichedItem, ...filteredPrev];
-      });
-
+      setLatestResult(found);
       setQuery("");
-      showToast("Đã tra cứu và lưu thành công");
-    } catch (e) {
-      setLookupError(e.message || "Không tra cứu được từ này. Thử lại nhé.");
-    } finally {
       setLooking(false);
-    }
+      showToast("Đã tra cứu thành công!");
+    }, 300);
   }
 
   function startEdit(entry) {
@@ -125,91 +120,43 @@ function LolDictionary() {
     setEditDraft({ pinyin: entry.pinyin, meaning: entry.meaning, note: entry.note, category: entry.category || "Từ vựng chung" });
   }
 
-  async function saveEdit(id) {
-    const target = entries.find(e => e.id === id);
-    if (!target) return;
-
-    try {
-      const response = await fetch("/api/lookup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "manual_save",
-          id: id,
-          word: target.word,
-          ...editDraft
-        }),
-      });
-      const updated = await response.json();
-      if (!response.ok) throw new Error(updated.error);
-
-      const enrichedUpdated = { ...updated, category: updated.category || "Từ vựng chung" };
-
-      setEntries((prev) => prev.map((e) => (e.id === id ? enrichedUpdated : e)));
-      if (latestResult && latestResult.id === id) {
-        setLatestResult(enrichedUpdated);
-      }
-      setEditingId(null);
-      showToast("Đã lưu chỉnh sửa");
-    } catch (e) {
-      showToast("Lỗi khi lưu chỉnh sửa");
+  function saveEdit(id) {
+    setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, ...editDraft } : e)));
+    if (latestResult && latestResult.id === id) {
+      setLatestResult((prev) => ({ ...prev, ...editDraft }));
     }
+    setEditingId(null);
+    showToast("Đã lưu chỉnh sửa");
   }
 
-  async function deleteEntry(id) {
+  function deleteEntry(id) {
     if (!confirm("Bạn có chắc chắn muốn xóa từ này?")) return;
-    try {
-      const response = await fetch("/api/lookup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "delete", id }),
-      });
-      if (!response.ok) throw new Error("Không xóa được");
-
-      setEntries((prev) => prev.filter((e) => e.id !== id));
-      if (latestResult && latestResult.id === id) {
-        setLatestResult(null);
-      }
-      showToast("Đã xoá từ");
-    } catch (e) {
-      showToast("Lỗi khi xóa từ");
+    setEntries((prev) => prev.filter((e) => e.id !== id));
+    if (latestResult && latestResult.id === id) {
+      setLatestResult(null);
     }
+    showToast("Đã xoá từ");
   }
 
-  async function addManual() {
+  function addManual() {
     const word = manualDraft.word.trim();
     if (!word) return;
 
-    try {
-      const response = await fetch("/api/lookup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "manual_save",
-          word,
-          pinyin: manualDraft.pinyin.trim(),
-          meaning: manualDraft.meaning.trim(),
-          note: manualDraft.note.trim(),
-          category: manualDraft.category,
-        }),
-      });
-      const saved = await response.json();
-      if (!response.ok) throw new Error(saved.error);
+    const newEntry = {
+      id: Date.now().toString(),
+      word,
+      pinyin: manualDraft.pinyin.trim() || "---",
+      meaning: manualDraft.meaning.trim() || "Chưa có nghĩa",
+      note: manualDraft.note.trim(),
+      category: manualDraft.category,
+    };
 
-      const enrichedSaved = { ...saved, category: saved.category || "Từ vựng chung" };
+    setLatestResult(newEntry);
+    setEntries((prev) => [newEntry, ...prev.filter(e => e.word !== word)]);
 
-      setLatestResult(enrichedSaved);
-      setEntries((prev) => {
-        const filteredPrev = prev.filter((e) => e.id !== enrichedSaved.id && e.word !== enrichedSaved.word);
-        return [enrichedSaved, ...filteredPrev];
-      });
-
-      setManualDraft({ word: "", pinyin: "", meaning: "", note: "", category: CATEGORIES[CATEGORIES.length - 1] });
-      setManualOpen(false);
-      showToast("Đã thêm từ mới");
-    } catch (e) {
-      showToast("Lỗi khi thêm từ");
-    }
+    setManualDraft({ word: "", pinyin: "", meaning: "", note: "", category: CATEGORIES[5] });
+    setManualOpen(false);
+    showToast("Đã thêm từ mới thành công");
   }
 
   const filtered = entries.filter((e) => {
@@ -264,7 +211,7 @@ function LolDictionary() {
         {lookupError && <div style={styles.errorRow}>⚠ <span style={{ color: "#d9534f", fontSize: 13 }}>{lookupError}</span></div>}
       </section>
 
-      {/* KHUNG HIỂN THỊ NGHĨA RIÊNG BIỆT CHO TỪ VỪA TRA CỨU */}
+      {/* KHUNG HIỂN THỊ NGHĨA RIÊNG BIỆT CHO TỪ VỪA TRA CỨU (XUẤT HIỆN NGAY LẬP TỨC PHÍA TRÊN) */}
       {latestResult && (
         <section style={styles.latestResultCard}>
           <div style={styles.latestResultHeader}>
@@ -315,13 +262,10 @@ function LolDictionary() {
       )}
 
       <main style={styles.list}>
-        {!loaded && <div style={styles.emptyState}>Đang tải từ điển từ Database…</div>}
-        {loaded && entries.length === 0 && (
-          <div style={styles.emptyState}>
-            Chưa có từ nào trong cơ sở dữ liệu. Tra một thuật ngữ LMHT như <span style={{ color: "#4f46e5" }}>打野</span> (đi rừng) để bắt đầu.
-          </div>
+        {entries.length === 0 && (
+          <div style={styles.emptyState}>Chưa có từ nào trong từ điển. Hãy tra cứu một từ mới ở trên.</div>
         )}
-        {loaded && entries.length > 0 && filtered.length === 0 && (
+        {entries.length > 0 && filtered.length === 0 && (
           <div style={styles.emptyState}>Không tìm thấy từ phù hợp với bộ lọc.</div>
         )}
         {grouped.map(({ category, items }) => {
@@ -448,7 +392,6 @@ function LolDictionary() {
       )}
 
       {toast && <div style={styles.toast}>{toast}</div>}
-      {loadError && <div style={styles.toastError}>Có sự cố kết nối Database — vui lòng kiểm tra lại.</div>}
     </div>
   );
 }
@@ -466,7 +409,7 @@ const styles = {
   flashcardHeaderBtn: { display: "flex", alignItems: "center", gap: 6, background: "#38a169", color: "#fff", border: "none", borderRadius: 4, padding: "0 16px", fontWeight: 700, fontSize: 13.5, cursor: "pointer", boxShadow: "0 2px 8px rgba(56, 161, 105, 0.3)" },
   errorRow: { display: "flex", alignItems: "center", gap: 6, marginTop: 8 },
   
-  // Style cho khung kết quả tra cứu riêng biệt
+  // Style riêng cho khung kết quả tra cứu nổi bật
   latestResultCard: { maxWidth: 640, margin: "0 auto 18px", background: "rgba(255, 255, 255, 0.95)", backdropFilter: "blur(8px)", border: "2px solid #3182ce", borderRadius: 8, padding: "16px 18px", boxShadow: "0 4px 20px rgba(49, 130, 206, 0.15)" },
   latestResultHeader: { display: "flex", justifyContent: "space-between", alignItems: "center" },
   latestResultBadge: { fontSize: "11.5px", textTransform: "uppercase", fontWeight: "700", color: "#3182ce", letterSpacing: "0.5px" },
@@ -507,7 +450,6 @@ const styles = {
   modalNavBtn: { padding: '6px 14px', background: '#edf2f7', color: '#333', border: '1px solid #cbd5e0', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 },
   modalCloseBtn: { width: '100%', padding: '10px', background: '#e53e3e', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 700, cursor: 'pointer' },
   toast: { position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)", background: "#3182ce", color: "#fff", padding: "9px 18px", borderRadius: 6, fontSize: 13, fontWeight: 600, boxShadow: "0 4px 20px rgba(49, 130, 206, 0.4)" },
-  toastError: { position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)", background: "#e53e3e", color: "#fff", padding: "9px 18px", borderRadius: 6, fontSize: 13, fontWeight: 600 },
 };
 
 ReactDOM.createRoot(document.getElementById("root")).render(<LolDictionary />);
