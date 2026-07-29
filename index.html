@@ -3,54 +3,28 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Rune Lexicon - Hoa Anh Đào</title>
+<title>Rune Lexicon</title>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <style>
-  /* Hiệu ứng hoa anh đào rơi */
-  @keyframes fall {
-    0% { transform: translateY(-10vh) translateX(0) rotate(0deg); opacity: 1; }
-    100% { transform: translateY(105vh) translateX(50px) rotate(360deg); opacity: 0.2; }
-  }
-  .petal {
-    position: fixed;
-    top: -10vh;
-    background: linear-gradient(135deg, #ffb7c5 0%, #ffc0cb 100%);
-    border-radius: 150% 0 150% 0;
-    pointer-events: none;
-    z-index: 1;
-    animation: fall linear infinite;
+  body {
+    margin: 0;
+    overflow-x: hidden;
+    background-image: url('URL_ANH_CUA_BAN'); /* Thay link ảnh hoặc tên file ảnh của bạn vào đây */
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
   }
 </style>
 </head>
 <body style="margin:0; overflow-x: hidden;">
-<!-- Các cánh hoa anh đào bay -->
-<div id="sakura-container"></div>
 <div id="root" style="position: relative; z-index: 2;"></div>
-
-<script>
-  // Tạo ngẫu nhiên cánh hoa rơi
-  const container = document.getElementById('sakura-container');
-  const petalCount = 20;
-  for (let i = 0; i < petalCount; i++) {
-    const petal = document.createElement('div');
-    petal.className = 'petal';
-    const size = Math.random() * 8 + 8;
-    petal.style.width = `${size}px`;
-    petal.style.height = `${size * 1.2}px`;
-    petal.style.left = `${Math.random() * 100}vw`;
-    petal.style.animationDuration = `${Math.random() * 5 + 5}s`;
-    petal.style.animationDelay = `${Math.random() * 5}s`;
-    petal.style.opacity = Math.random() * 0.7 + 0.3;
-    container.appendChild(petal);
-  }
-</script>
 
 <script type="text/babel">
 const { useState, useEffect } = React;
 
-const STORAGE_KEY = "lol-hanzi-entries";
 const CATEGORIES = [
   "Tên tướng",
   "Kỹ năng / Chiêu thức",
@@ -59,10 +33,6 @@ const CATEGORIES = [
   "Thuật ngữ trận đấu",
   "Từ vựng chung",
 ];
-
-function uid() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-}
 
 function LolDictionary() {
   const [entries, setEntries] = useState([]);
@@ -83,31 +53,31 @@ function LolDictionary() {
     setClosedFolders((prev) => ({ ...prev, [cat]: !prev[cat] }));
   }
 
-  useEffect(() => {
+  // Tải danh sách từ vựng từ Supabase thông qua API (GET)
+  async function fetchEntries() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        setEntries(parsed.map((e) => ({ ...e, category: e.category || "Từ vựng chung" })));
-      }
-    } catch (e) {}
-    setLoaded(true);
-  }, []);
-
-  function persist(next) {
-    setEntries(next);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      const res = await fetch("/api/lookup");
+      if (!res.ok) throw new Error("Không thể tải dữ liệu");
+      const data = await res.json();
+      setEntries(data.map((e) => ({ ...e, category: e.category || "Từ vựng chung" })));
+      setLoadError(false);
     } catch (e) {
       setLoadError(true);
+    } finally {
+      setLoaded(true);
     }
   }
+
+  useEffect(() => {
+    fetchEntries();
+  }, []);
 
   function showToast(msg) {
     setToast(msg);
     setTimeout(() => setToast(""), 2200);
   }
 
+  // Tra cứu từ mới hoặc lấy từ có sẵn qua AI + Database (POST mặc định)
   async function handleLookup() {
     const word = query.trim();
     if (!word) return;
@@ -122,26 +92,20 @@ function LolDictionary() {
       const parsed = await response.json();
       if (!response.ok) throw new Error(parsed.error || "API lỗi");
 
-      const existingIdx = entries.findIndex((e) => e.word === word);
-      const newEntry = {
-        id: existingIdx >= 0 ? entries[existingIdx].id : uid(),
-        word,
-        pinyin: parsed.pinyin || "",
-        meaning: parsed.meaning || "",
-        note: parsed.note || "",
-        category: parsed.category || "Từ vựng chung",
-        createdAt: existingIdx >= 0 ? entries[existingIdx].createdAt : Date.now(),
-      };
-      let next;
-      if (existingIdx >= 0) {
-        next = [...entries];
-        next[existingIdx] = newEntry;
-      } else {
-        next = [newEntry, ...entries];
-      }
-      persist(next);
+      // Cập nhật lại danh sách trên giao diện
+      setEntries((prev) => {
+        const existingIdx = prev.findIndex((e) => e.id === parsed.id || e.word === parsed.word);
+        if (existingIdx >= 0) {
+          const next = [...prev];
+          next[existingIdx] = parsed;
+          return next;
+        } else {
+          return [parsed, ...prev];
+        }
+      });
+
       setQuery("");
-      showToast(existingIdx >= 0 ? "Đã cập nhật lại từ đã có" : "Đã lưu vào từ điển");
+      showToast("Đã lưu / tra cứu thành công");
     } catch (e) {
       setLookupError(e.message || "Không tra cứu được từ này. Thử lại nhé.");
     } finally {
@@ -154,43 +118,88 @@ function LolDictionary() {
     setEditDraft({ pinyin: entry.pinyin, meaning: entry.meaning, note: entry.note, category: entry.category || "Từ vựng chung" });
   }
 
-  function saveEdit(id) {
-    const next = entries.map((e) => (e.id === id ? { ...e, ...editDraft } : e));
-    persist(next);
-    setEditingId(null);
-    showToast("Đã lưu chỉnh sửa");
+  // Lưu chỉnh sửa (Gọi action 'manual_save' qua API)
+  async function saveEdit(id) {
+    const target = entries.find(e => e.id === id);
+    if (!target) return;
+
+    try {
+      const response = await fetch("/api/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "manual_save",
+          id: id,
+          word: target.word,
+          ...editDraft
+        }),
+      });
+      const updated = await response.json();
+      if (!response.ok) throw new Error(updated.error);
+
+      setEntries((prev) => prev.map((e) => (e.id === id ? updated : e)));
+      setEditingId(null);
+      showToast("Đã lưu chỉnh sửa");
+    } catch (e) {
+      showToast("Lỗi khi lưu chỉnh sửa");
+    }
   }
 
-  function deleteEntry(id) {
-    const next = entries.filter((e) => e.id !== id);
-    persist(next);
-    showToast("Đã xoá từ");
+  // Xóa từ (Gọi action 'delete' qua API)
+  async function deleteEntry(id) {
+    if (!confirm("Bạn có chắc chắn muốn xóa từ này?")) return;
+    try {
+      const response = await fetch("/api/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete", id }),
+      });
+      if (!response.ok) throw new Error("Không xóa được");
+
+      setEntries((prev) => prev.filter((e) => e.id !== id));
+      showToast("Đã xoá từ");
+    } catch (e) {
+      showToast("Lỗi khi xóa từ");
+    }
   }
 
-  function addManual() {
+  // Thêm từ thủ công (Gọi action 'manual_save' qua API)
+  async function addManual() {
     const word = manualDraft.word.trim();
     if (!word) return;
-    const existingIdx = entries.findIndex((e) => e.word === word);
-    const entry = {
-      id: existingIdx >= 0 ? entries[existingIdx].id : uid(),
-      word,
-      pinyin: manualDraft.pinyin.trim(),
-      meaning: manualDraft.meaning.trim(),
-      note: manualDraft.note.trim(),
-      category: manualDraft.category || "Từ vựng chung",
-      createdAt: existingIdx >= 0 ? entries[existingIdx].createdAt : Date.now(),
-    };
-    let next;
-    if (existingIdx >= 0) {
-      next = [...entries];
-      next[existingIdx] = entry;
-    } else {
-      next = [entry, ...entries];
+
+    try {
+      const response = await fetch("/api/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "manual_save",
+          word,
+          pinyin: manualDraft.pinyin.trim(),
+          meaning: manualDraft.meaning.trim(),
+          note: manualDraft.note.trim(),
+          category: manualDraft.category,
+        }),
+      });
+      const saved = await response.json();
+      if (!response.ok) throw new Error(saved.error);
+
+      setEntries((prev) => {
+        const existingIdx = prev.findIndex((e) => e.id === saved.id || e.word === saved.word);
+        if (existingIdx >= 0) {
+          const next = [...prev];
+          next[existingIdx] = saved;
+          return next;
+        }
+        return [saved, ...prev];
+      });
+
+      setManualDraft({ word: "", pinyin: "", meaning: "", note: "", category: CATEGORIES[CATEGORIES.length - 1] });
+      setManualOpen(false);
+      showToast("Đã thêm từ mới");
+    } catch (e) {
+      showToast("Lỗi khi thêm từ");
     }
-    persist(next);
-    setManualDraft({ word: "", pinyin: "", meaning: "", note: "", category: CATEGORIES[CATEGORIES.length - 1] });
-    setManualOpen(false);
-    showToast("Đã thêm từ mới");
   }
 
   const filtered = entries.filter((e) => {
@@ -213,10 +222,10 @@ function LolDictionary() {
     <div style={styles.page}>
       <header style={styles.header}>
         <div style={styles.brandRow}>
-          <span style={{ fontSize: 22 }}>🌸</span>
+          <span style={{ fontSize: 22 }}>📖</span>
           <h1 style={styles.title}>Rune Lexicon</h1>
         </div>
-        <p style={styles.subtitle}>Từ điển Hán ngữ · thuật ngữ Liên Minh Huyền Thoại (Bản Hoa Anh Đào)</p>
+        <p style={styles.subtitle}>Từ điển Hán ngữ · thuật ngữ Liên Minh Huyền Thoại</p>
       </header>
 
       <section style={styles.searchCard}>
@@ -241,7 +250,7 @@ function LolDictionary() {
 
       <section style={styles.listHeader}>
         <div style={styles.listHeaderLeft}>
-          <span style={styles.listCount}>📖 {entries.length} mục từ</span>
+          <span style={styles.listCount}>📚 {entries.length} mục từ</span>
         </div>
         <div style={styles.filterRow}>
           <input
@@ -273,10 +282,10 @@ function LolDictionary() {
       )}
 
       <main style={styles.list}>
-        {!loaded && <div style={styles.emptyState}>Đang tải từ điển…</div>}
+        {!loaded && <div style={styles.emptyState}>Đang tải từ điển từ Database…</div>}
         {loaded && entries.length === 0 && (
           <div style={styles.emptyState}>
-            Chưa có từ nào. Tra một thuật ngữ LMHT như <span style={{ color: "#d63384" }}>打野</span> (đi rừng) để bắt đầu.
+            Chưa có từ nào trong cơ sở dữ liệu. Tra một thuật ngữ LMHT như <span style={{ color: "#4f46e5" }}>打野</span> (đi rừng) để bắt đầu.
           </div>
         )}
         {loaded && entries.length > 0 && filtered.length === 0 && (
@@ -288,7 +297,7 @@ function LolDictionary() {
             <div key={category} style={styles.folder}>
               <div style={styles.folderHeader} onClick={() => toggleFolder(category)}>
                 <span style={styles.folderArrow}>{isClosed ? "▶" : "▼"}</span>
-                <span style={styles.folderName}>🌸 {category}</span>
+                <span style={styles.folderName}>📁 {category}</span>
                 <span style={styles.folderCount}>{items.length}</span>
               </div>
               {!isClosed && (
@@ -342,53 +351,53 @@ function LolDictionary() {
       </main>
 
       {toast && <div style={styles.toast}>{toast}</div>}
-      {loadError && <div style={styles.toastError}>Có sự cố khi lưu — dữ liệu có thể chưa được cập nhật.</div>}
+      {loadError && <div style={styles.toastError}>Có sự cố kết nối Database — vui lòng kiểm tra lại.</div>}
     </div>
   );
 }
 
 const styles = {
-  page: { minHeight: "100vh", background: "linear-gradient(135deg, #fff0f5 0%, #ffe4e1 50%, #fdf2f8 100%)", color: "#4a3b4c", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", padding: "28px 16px 60px", position: "relative" },
+  page: { minHeight: "100vh", color: "#2d3748", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", padding: "28px 16px 60px", position: "relative" },
   header: { maxWidth: 640, margin: "0 auto 22px", textAlign: "center", position: "relative" },
   brandRow: { display: "flex", alignItems: "center", justifyContent: "center", gap: 8 },
-  title: { fontSize: 26, fontWeight: 700, letterSpacing: 1, margin: 0, color: "#d63384", textShadow: "0 0 12px rgba(214,51,132,0.15)" },
-  subtitle: { fontSize: 12.5, color: "#8a6d88", marginTop: 6, letterSpacing: 0.4 },
-  searchCard: { maxWidth: 640, margin: "0 auto 18px", background: "rgba(255, 255, 255, 0.85)", backdropFilter: "blur(8px)", border: "1px solid #ffccd5", borderRadius: 8, padding: 14, boxShadow: "0 4px 20px rgba(255, 182, 193, 0.2)" },
+  title: { fontSize: 26, fontWeight: 700, letterSpacing: 1, margin: 0, color: "#1a202c", textShadow: "0 2px 4px rgba(255,255,255,0.8)" },
+  subtitle: { fontSize: 12.5, color: "#4a5568", marginTop: 6, letterSpacing: 0.4, fontWeight: 600, textShadow: "0 1px 2px rgba(255,255,255,0.8)" },
+  searchCard: { maxWidth: 640, margin: "0 auto 18px", background: "rgba(255, 255, 255, 0.9)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.6)", borderRadius: 8, padding: 14, boxShadow: "0 4px 20px rgba(0, 0, 0, 0.08)" },
   searchRow: { display: "flex", gap: 8 },
-  searchInput: { flex: 1, background: "#fff", border: "1px solid #ffb6c1", borderRadius: 4, padding: "11px 12px", color: "#4a3b4c", fontSize: 15, fontFamily: "inherit", outline: "none" },
-  searchBtn: { display: "flex", alignItems: "center", gap: 6, background: "linear-gradient(135deg, #ff758c, #ff7eb3)", color: "#fff", border: "none", borderRadius: 4, padding: "0 18px", fontWeight: 700, fontSize: 13.5, cursor: "pointer", boxShadow: "0 2px 8px rgba(255, 117, 140, 0.3)" },
+  searchInput: { flex: 1, background: "#fff", border: "1px solid #cbd5e0", borderRadius: 4, padding: "11px 12px", color: "#2d3748", fontSize: 15, fontFamily: "inherit", outline: "none" },
+  searchBtn: { display: "flex", alignItems: "center", gap: 6, background: "#3182ce", color: "#fff", border: "none", borderRadius: 4, padding: "0 18px", fontWeight: 700, fontSize: 13.5, cursor: "pointer", boxShadow: "0 2px 8px rgba(49, 130, 206, 0.3)" },
   errorRow: { display: "flex", alignItems: "center", gap: 6, marginTop: 8 },
   listHeader: { maxWidth: 640, margin: "0 auto 10px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 },
   listHeaderLeft: { display: "flex", alignItems: "center", gap: 6 },
-  listCount: { fontSize: 12.5, color: "#8a6d88", letterSpacing: 0.3 },
+  listCount: { fontSize: 12.5, color: "#2d3748", fontWeight: 600, letterSpacing: 0.3, textShadow: "0 1px 2px rgba(255,255,255,0.8)" },
   filterRow: { display: "flex", gap: 8 },
-  filterInput: { background: "#fff", border: "1px solid #ffb6c1", borderRadius: 4, padding: "7px 10px", color: "#4a3b4c", fontSize: 13, fontFamily: "inherit", outline: "none", width: 160 },
-  addBtn: { display: "flex", alignItems: "center", gap: 5, background: "transparent", border: "1px solid #ff758c", color: "#d63384", borderRadius: 4, padding: "7px 12px", fontSize: 12.5, fontWeight: 600, cursor: "pointer" },
-  manualCard: { maxWidth: 640, margin: "0 auto 16px", background: "rgba(255, 255, 255, 0.9)", border: "1px solid #ff758c", borderRadius: 8, padding: 14, boxShadow: "0 4px 15px rgba(255, 182, 193, 0.25)" },
+  filterInput: { background: "rgba(255,255,255,0.9)", border: "1px solid #cbd5e0", borderRadius: 4, padding: "7px 10px", color: "#2d3748", fontSize: 13, fontFamily: "inherit", outline: "none", width: 160 },
+  addBtn: { display: "flex", alignItems: "center", gap: 5, background: "rgba(255,255,255,0.9)", border: "1px solid #cbd5e0", color: "#2b6cb0", borderRadius: 4, padding: "7px 12px", fontSize: 12.5, fontWeight: 600, cursor: "pointer" },
+  manualCard: { maxWidth: 640, margin: "0 auto 16px", background: "rgba(255, 255, 255, 0.95)", border: "1px solid #cbd5e0", borderRadius: 8, padding: 14, boxShadow: "0 4px 15px rgba(0, 0, 0, 0.1)" },
   manualGrid: { display: "flex", gap: 8 },
-  manualInput: { flex: 1, background: "#fff", border: "1px solid #ffb6c1", borderRadius: 4, padding: "9px 10px", color: "#4a3b4c", fontSize: 13.5, fontFamily: "inherit", outline: "none" },
-  saveBtn: { display: "flex", alignItems: "center", gap: 5, background: "#ff758c", color: "#fff", border: "none", borderRadius: 4, padding: "7px 14px", fontWeight: 700, fontSize: 12.5, cursor: "pointer" },
-  cancelBtn: { display: "flex", alignItems: "center", gap: 5, background: "transparent", color: "#8a6d88", border: "1px solid #ffb6c1", borderRadius: 4, padding: "7px 14px", fontSize: 12.5, cursor: "pointer" },
+  manualInput: { flex: 1, background: "#fff", border: "1px solid #cbd5e0", borderRadius: 4, padding: "9px 10px", color: "#2d3748", fontSize: 13.5, fontFamily: "inherit", outline: "none" },
+  saveBtn: { display: "flex", alignItems: "center", gap: 5, background: "#3182ce", color: "#fff", border: "none", borderRadius: 4, padding: "7px 14px", fontWeight: 700, fontSize: 12.5, cursor: "pointer" },
+  cancelBtn: { display: "flex", alignItems: "center", gap: 5, background: "transparent", color: "#4a5568", border: "1px solid #cbd5e0", borderRadius: 4, padding: "7px 14px", fontSize: 12.5, cursor: "pointer" },
   list: { maxWidth: 640, margin: "0 auto", display: "flex", flexDirection: "column", gap: 14 },
-  folder: { border: "1px solid #ffccd5", borderRadius: 8, overflow: "hidden", background: "rgba(255, 255, 255, 0.6)", backdropFilter: "blur(5px)" },
-  folderHeader: { display: "flex", alignItems: "center", gap: 8, background: "rgba(255, 182, 193, 0.2)", padding: "10px 12px", cursor: "pointer", userSelect: "none" },
-  folderArrow: { fontSize: 10, color: "#d63384" },
-  folderName: { fontSize: 14, fontWeight: 700, color: "#d63384", flex: 1 },
-  folderCount: { fontSize: 11.5, color: "#8a6d88", background: "rgba(255, 255, 255, 0.8)", padding: "2px 8px", borderRadius: 10 },
+  folder: { border: "1px solid rgba(255,255,255,0.6)", borderRadius: 8, overflow: "hidden", background: "rgba(255, 255, 255, 0.8)", backdropFilter: "blur(5px)" },
+  folderHeader: { display: "flex", alignItems: "center", gap: 8, background: "rgba(255, 255, 255, 0.9)", padding: "10px 12px", cursor: "pointer", userSelect: "none" },
+  folderArrow: { fontSize: 10, color: "#3182ce" },
+  folderName: { fontSize: 14, fontWeight: 700, color: "#2b6cb0", flex: 1 },
+  folderCount: { fontSize: 11.5, color: "#4a5568", background: "rgba(237, 242, 247, 0.8)", padding: "2px 8px", borderRadius: 10 },
   folderBody: { display: "flex", flexDirection: "column", gap: 8, padding: 10 },
-  emptyState: { textAlign: "center", color: "#8a6d88", fontSize: 13.5, padding: "30px 10px", border: "1px dashed #ffb6c1", borderRadius: 8, background: "rgba(255,255,255,0.4)" },
-  card: { background: "rgba(255, 255, 255, 0.85)", border: "1px solid #ffccd5", borderLeft: "3px solid #ff758c", borderRadius: 6, padding: "13px 14px", boxShadow: "0 2px 10px rgba(0,0,0,0.02)" },
+  emptyState: { textAlign: "center", color: "#2d3748", fontWeight: 600, fontSize: 13.5, padding: "30px 10px", border: "1px dashed rgba(255,255,255,0.8)", borderRadius: 8, background: "rgba(255,255,255,0.7)", textShadow: "0 1px 2px rgba(255,255,255,0.8)" },
+  card: { background: "rgba(255, 255, 255, 0.92)", border: "1px solid #e2e8f0", borderLeft: "3px solid #3182ce", borderRadius: 6, padding: "13px 14px", boxShadow: "0 2px 10px rgba(0,0,0,0.04)" },
   cardTop: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" },
-  word: { fontSize: 20, fontWeight: 700, marginRight: 10, color: "#3a2e3b" },
-  pinyin: { fontSize: 13.5, color: "#d63384" },
-  meaning: { margin: "6px 0 2px", fontSize: 14.5, color: "#4a3b4c", lineHeight: 1.5 },
-  note: { margin: "4px 0 0", fontSize: 12.5, color: "#8a6d88", lineHeight: 1.4, fontStyle: "italic" },
-  inlineInput: { background: "#fff", border: "1px solid #ffb6c1", borderRadius: 4, padding: "5px 8px", color: "#4a3b4c", fontSize: 13, fontFamily: "inherit", outline: "none" },
-  iconBtn: { background: "transparent", border: "1px solid #ffb6c1", color: "#8a6d88", borderRadius: 4, padding: "6px 9px", cursor: "pointer" },
-  iconBtnGood: { background: "#ff758c", border: "none", color: "#fff", borderRadius: 4, padding: "6px 9px", cursor: "pointer" },
-  iconBtnBad: { background: "transparent", border: "1px solid #ff6b6b", color: "#d9534f", borderRadius: 4, padding: "6px 9px", cursor: "pointer" },
-  toast: { position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)", background: "#ff758c", color: "#fff", padding: "9px 18px", borderRadius: 6, fontSize: 13, fontWeight: 600, boxShadow: "0 4px 20px rgba(255, 117, 140, 0.4)" },
-  toastError: { position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)", background: "#d9534f", color: "#fff", padding: "9px 18px", borderRadius: 6, fontSize: 13, fontWeight: 600 },
+  word: { fontSize: 20, fontWeight: 700, marginRight: 10, color: "#1a202c" },
+  pinyin: { fontSize: 13.5, color: "#3182ce", fontWeight: 600 },
+  meaning: { margin: "6px 0 2px", fontSize: 14.5, color: "#2d3748", lineHeight: 1.5 },
+  note: { margin: "4px 0 0", fontSize: 12.5, color: "#718096", lineHeight: 1.4, fontStyle: "italic" },
+  inlineInput: { background: "#fff", border: "1px solid #cbd5e0", borderRadius: 4, padding: "5px 8px", color: "#2d3748", fontSize: 13, fontFamily: "inherit", outline: "none" },
+  iconBtn: { background: "transparent", border: "1px solid #cbd5e0", color: "#4a5568", borderRadius: 4, padding: "6px 9px", cursor: "pointer" },
+  iconBtnGood: { background: "#3182ce", border: "none", color: "#fff", borderRadius: 4, padding: "6px 9px", cursor: "pointer" },
+  iconBtnBad: { background: "transparent", border: "1px solid #e53e3e", color: "#e53e3e", borderRadius: 4, padding: "6px 9px", cursor: "pointer" },
+  toast: { position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)", background: "#3182ce", color: "#fff", padding: "9px 18px", borderRadius: 6, fontSize: 13, fontWeight: 600, boxShadow: "0 4px 20px rgba(49, 130, 206, 0.4)" },
+  toastError: { position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)", background: "#e53e3e", color: "#fff", padding: "9px 18px", borderRadius: 6, fontSize: 13, fontWeight: 600 },
 };
 
 ReactDOM.createRoot(document.getElementById("root")).render(<LolDictionary />);
