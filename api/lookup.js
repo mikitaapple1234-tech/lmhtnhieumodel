@@ -1,4 +1,4 @@
-// Vercel serverless function — Tích hợp Supabase + Gemini 1.5 Flash & Groq
+// Vercel serverless function — Tích hợp Supabase + Gemini & Groq
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -122,7 +122,7 @@ Nếu từ không thuộc rõ về LMHT, chọn "Từ vựng chung".`;
     };
   }
 
-  // BƯỚC 1: Gemini 1.5 Flash
+  // BƯỚC 1: Gemini (Giữ nguyên tên model yêu cầu)
   if (geminiKey) {
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${geminiKey}`;
