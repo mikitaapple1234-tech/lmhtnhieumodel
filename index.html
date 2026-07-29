@@ -216,7 +216,7 @@ function LolDictionary() {
       <header style={styles.header}>
         <div style={styles.brandRow}>
           <span style={{ fontSize: 22 }}>📖</span>
-          <h1 style={styles.title}>Rune Lexicon</h1>
+          <h1 style={styles.title}>TỪ ĐIỂN LIÊN MINH</h1>
         </div>
         <p style={styles.subtitle}>Từ điển Hán ngữ · LIÊN MINH HUYỀN THOẠI</p>
       </header>
@@ -436,7 +436,17 @@ const styles = {
   page: { minHeight: "100vh", color: "#2d3748", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", padding: "28px 16px 60px", position: "relative" },
   header: { maxWidth: 640, margin: "0 auto 22px", textAlign: "center", position: "relative" },
   brandRow: { display: "flex", alignItems: "center", justifyContent: "center", gap: 8 },
-  title: { fontSize: 26, fontWeight: 700, letterSpacing: 1, margin: 0, color: "#1a202c", textShadow: "0 2px 4px rgba(255,255,255,0.8)" },
+  title: { 
+    fontSize: 26, 
+    fontWeight: 800, 
+    letterSpacing: 1.2, 
+    margin: 0, 
+    textTransform: 'uppercase',
+    background: 'linear-gradient(135deg, #BF953F 0%, #FCF6BA 25%, #B38728 50%, #FBF5B7 75%, #AA771C 100%)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    filter: 'drop-shadow(0px 2px 3px rgba(0,0,0,0.6))',
+  },
   subtitle: { 
     fontSize: 13, 
     fontWeight: 800, 
