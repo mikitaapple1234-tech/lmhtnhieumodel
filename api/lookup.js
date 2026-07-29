@@ -1,7 +1,5 @@
-import { GoogleGenAI } from "@google/genai";
+// Vercel serverless function — Tích hợp Supabase + Gemini 1.5 Flash & Groq
 import { createClient } from '@supabase/supabase-js';
-
-const ai = new GoogleGenAI();
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
@@ -94,11 +92,16 @@ export default async function handler(req, res) {
     }
   }
 
+  const geminiKey = process.env.GEMINI_API_KEY;
   const groqKey = process.env.GROQ_API_KEY;
+
+  if (!geminiKey && !groqKey) {
+    return res.status(500).json({ error: "Server chưa cấu hình API Key AI nào (Gemini hoặc Groq)" });
+  }
 
   const system = `Bạn là trợ lý tra cứu từ vựng tiếng Trung chuyên về game Liên Minh Huyền Thoại (LMHT / League of Legends).
 Người dùng sẽ đưa ra một từ hoặc cụm từ tiếng Trung (có thể là thuật ngữ trong game, tên tướng, kỹ năng, hoặc từ vựng thông thường).
-Trả lời DUY NHẤT một đối tượng JSON hợp lệ theo đúng định dạng (không kèm markdown):
+Trả lời DUY NHẤT một đối tượng JSON hợp lệ theo đúng định dạng:
 {"pinyin": "...", "meaning": "...", "note": "...", "category": "..."}
 - "pinyin": phiên âm pinyin có dấu thanh của từ.
 - "meaning": nghĩa tiếng Việt, ngắn gọn, súc tích. Nếu từ có liên quan đến LMHT hãy ưu tiên nghĩa trong ngữ cảnh đó.
@@ -106,8 +109,8 @@ Trả lời DUY NHẤT một đối tượng JSON hợp lệ theo đúng định
 - "category": chọn CHÍNH XÁC một trong các nhóm sau: ${CATEGORIES.map((c) => `"${c}"`).join(", ")}.
 Nếu từ không thuộc rõ về LMHT, chọn "Từ vựng chung".`;
 
-  let aiResult = null;
   let lastErrorDetail = "";
+  let aiResult = null;
 
   function normalize(parsed) {
     return {
@@ -119,29 +122,40 @@ Nếu từ không thuộc rõ về LMHT, chọn "Từ vựng chung".`;
     };
   }
 
-  // BƯỚC 1: Thử dùng Gemini trước
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: `${system}\n\nTừ cần tra: ${cleanWord}`,
-    });
+  // BƯỚC 1: Gemini 1.5 Flash
+  if (geminiKey) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `${system}\n\nTừ cần tra: ${cleanWord}` }] }],
+          generationConfig: { responseMimeType: "application/json" },
+        }),
+      });
 
-    const textResponse = response.text ? response.text.trim() : "";
-    if (textResponse) {
-      const jsonString = textResponse.replace(/^```json\s*/, "").replace(/^```\s*/, "").replace(/\s*```$/, "");
-      const parsed = JSON.parse(jsonString);
-      aiResult = normalize(parsed);
-    } else {
-      lastErrorDetail = "Gemini không trả về nội dung";
+      if (!response.ok) {
+        lastErrorDetail = `Gemini lỗi: ${await response.text()}`;
+      } else {
+        const data = await response.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) {
+          const parsed = JSON.parse(text.replace(/```json|```/g, "").trim());
+          aiResult = normalize(parsed);
+        } else {
+          lastErrorDetail = "Gemini không trả về nội dung";
+        }
+      }
+    } catch (e) {
+      lastErrorDetail = `Lỗi Gemini: ${String(e)}`;
     }
-  } catch (e) {
-    lastErrorDetail = `Lỗi Gemini: ${String(e)}`;
   }
 
-  // BƯỚC 2: Nếu Gemini lỗi/không trả về, chuyển sang dùng Groq
+  // BƯỚC 2: Groq (nếu Gemini không thành công)
   if (!aiResult && groqKey) {
     try {
-      const response = await fetch("[https://api.groq.com/openai/v1/chat/completions](https://api.groq.com/openai/v1/chat/completions)", {
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -176,7 +190,7 @@ Nếu từ không thuộc rõ về LMHT, chọn "Từ vựng chung".`;
     return res.status(502).json({ error: "Cả Gemini và Groq đều không phản hồi được", detail: lastErrorDetail });
   }
 
-  // Lưu kết quả AI vào Supabase tự động và trả về object hoàn chỉnh kèm ID
+  // Lưu kết quả AI vào Supabase tự động
   if (supabase) {
     const { data: saved, error: saveError } = await supabase
       .from('dictionary')
@@ -190,5 +204,4 @@ Nếu từ không thuộc rõ về LMHT, chọn "Từ vựng chung".`;
   }
 
   return res.status(200).json(aiResult);
-  }
-                                   
+    }
