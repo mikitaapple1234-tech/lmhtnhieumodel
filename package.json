@@ -1,0 +1,9 @@
+{
+  "name": "rune-lexicon",
+  "version": "1.0.0",
+  "description": "Từ điển Hán ngữ - thuật ngữ LMHT tích hợp Supabase và AI",
+  "private": true,
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0"
+  }
+}
