@@ -79,7 +79,7 @@ export default async function handler(req, res) {
 
   const cleanWord = word.trim();
 
-  // Kiểm tra xem từ này đã có trong Supabase chưa
+  // Kiểm tra xem từ này đã có trong Supabase chưa (nếu có trả về ngay)
   if (supabase) {
     const { data: existing } = await supabase
       .from('dictionary')
@@ -190,11 +190,19 @@ Nếu từ không thuộc rõ về LMHT, chọn "Từ vựng chung".`;
     return res.status(502).json({ error: "Cả Gemini và Groq đều không phản hồi được", detail: lastErrorDetail });
   }
 
-  // Lưu kết quả AI vào Supabase tự động
+  // LƯU AN TOÀN VÀO SUPABASE (Giữ lại ID cũ nếu đã tồn tại để tránh xung đột mất dữ liệu)
   if (supabase) {
+    const { data: existingRow } = await supabase
+      .from('dictionary')
+      .select('id')
+      .eq('word', aiResult.word)
+      .single();
+
+    const payloadToSave = existingRow ? { ...aiResult, id: existingRow.id } : aiResult;
+
     const { data: saved, error: saveError } = await supabase
       .from('dictionary')
-      .upsert(aiResult, { onConflict: 'word' })
+      .upsert(payloadToSave, { onConflict: 'word' })
       .select()
       .single();
 
@@ -204,4 +212,4 @@ Nếu từ không thuộc rõ về LMHT, chọn "Từ vựng chung".`;
   }
 
   return res.status(200).json(aiResult);
-    }
+      }
