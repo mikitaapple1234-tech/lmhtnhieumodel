@@ -218,7 +218,7 @@ function LolDictionary() {
           <span style={{ fontSize: 22 }}>📖</span>
           <h1 style={styles.title}>Rune Lexicon</h1>
         </div>
-        <p style={styles.subtitle}>Từ điển Hán ngữ · thuật ngữ Liên Minh Huyền Thoại</p>
+        <p style={styles.subtitle}>Từ điển Hán ngữ · LIÊN MINH HUYỀN THOẠI</p>
       </header>
 
       <section style={styles.searchCard}>
@@ -437,7 +437,17 @@ const styles = {
   header: { maxWidth: 640, margin: "0 auto 22px", textAlign: "center", position: "relative" },
   brandRow: { display: "flex", alignItems: "center", justifyContent: "center", gap: 8 },
   title: { fontSize: 26, fontWeight: 700, letterSpacing: 1, margin: 0, color: "#1a202c", textShadow: "0 2px 4px rgba(255,255,255,0.8)" },
-  subtitle: { fontSize: 12.5, color: "#4a5568", marginTop: 6, letterSpacing: 0.4, fontWeight: 600, textShadow: "0 1px 2px rgba(255,255,255,0.8)" },
+  subtitle: { 
+    fontSize: 13, 
+    fontWeight: 800, 
+    letterSpacing: 0.8, 
+    marginTop: 6, 
+    textTransform: 'uppercase',
+    background: 'linear-gradient(135deg, #BF953F 0%, #FCF6BA 25%, #B38728 50%, #FBF5B7 75%, #AA771C 100%)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    filter: 'drop-shadow(0px 1px 2px rgba(0,0,0,0.6))',
+  },
   searchCard: { maxWidth: 640, margin: "0 auto 18px", background: "rgba(255, 255, 255, 0.9)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.6)", borderRadius: 8, padding: 14, boxShadow: "0 4px 20px rgba(0, 0, 0, 0.08)" },
   searchRow: { display: "flex", gap: 8, flexWrap: "wrap" },
   searchInput: { flex: 1, minWidth: 160, background: "#fff", border: "1px solid #cbd5e0", borderRadius: 4, padding: "11px 12px", color: "#2d3748", fontSize: 15, fontFamily: "inherit", outline: "none" },
