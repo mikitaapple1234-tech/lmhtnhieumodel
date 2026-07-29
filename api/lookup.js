@@ -1,6 +1,4 @@
-// Vercel serverless function — Tích hợp Supabase + Gemini 3.5 Flash & Groq (GPT-OSS 120B)
-// Đặt biến môi trường trên Vercel: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (hoặc ANON_KEY), GEMINI_API_KEY, GROQ_API_KEY
-
+// Vercel serverless function — Tích hợp Supabase + Gemini 1.5 Flash & Groq
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -64,7 +62,6 @@ export default async function handler(req, res) {
       category: CATEGORIES.includes(category) ? category : "Từ vựng chung",
     };
 
-    // Nếu có id thì update, chưa có thì upsert theo cột word
     const { data, error } = await supabase
       .from('dictionary')
       .upsert(id ? { id, ...payload } : payload, { onConflict: 'word' })
@@ -82,7 +79,7 @@ export default async function handler(req, res) {
 
   const cleanWord = word.trim();
 
-  // Kiểm tra xem từ này đã có trong Supabase chưa để tiết kiệm thời gian & API AI
+  // Kiểm tra xem từ này đã có trong Supabase chưa
   if (supabase) {
     const { data: existing } = await supabase
       .from('dictionary')
@@ -91,7 +88,6 @@ export default async function handler(req, res) {
       .single();
 
     if (existing) {
-      // Đã có trong DB, trả về luôn
       return res.status(200).json(existing);
     }
   }
@@ -108,10 +104,10 @@ Người dùng sẽ đưa ra một từ hoặc cụm từ tiếng Trung (có th�
 Trả lời DUY NHẤT một đối tượng JSON hợp lệ theo đúng định dạng:
 {"pinyin": "...", "meaning": "...", "note": "...", "category": "..."}
 - "pinyin": phiên âm pinyin có dấu thanh của từ.
-- "meaning": nghĩa tiếng Việt, ngắn gọn, súc tích. Nếu từ có liên quan đến LMHT (thuật ngữ game, tên tướng, lối chơi, vị trí, chiêu thức...) hãy ưu tiên nghĩa trong ngữ cảnh đó.
-- "note": ghi chú thêm ngắn gọn (cách dùng, ví dụ trong game, hoặc phân biệt với từ dễ nhầm), có thể để chuỗi rỗng nếu không cần thiết.
-- "category": chọn CHÍNH XÁC một trong các nhóm sau (viết đúng nguyên văn, không tự đặt tên khác): ${CATEGORIES.map((c) => `"${c}"`).join(", ")}.
-  Nếu từ không thuộc rõ về LMHT (từ vựng tiếng Trung thông thường), chọn "Từ vựng chung".`;
+- "meaning": nghĩa tiếng Việt, ngắn gọn, súc tích. Nếu từ có liên quan đến LMHT hãy ưu tiên nghĩa trong ngữ cảnh đó.
+- "note": ghi chú thêm ngắn gọn, có thể để chuỗi rỗng nếu không cần thiết.
+- "category": chọn CHÍNH XÁC một trong các nhóm sau: ${CATEGORIES.map((c) => `"${c}"`).join(", ")}.
+Nếu từ không thuộc rõ về LMHT, chọn "Từ vựng chung".`;
 
   let lastErrorDetail = "";
   let aiResult = null;
@@ -126,10 +122,10 @@ Trả lời DUY NHẤT một đối tượng JSON hợp lệ theo đúng định
     };
   }
 
-  // BƯỚC 1: Gemini 3.5 Flash
+  // BƯỚC 1: Gemini 1.5 Flash
   if (geminiKey) {
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${geminiKey}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
       const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -166,7 +162,7 @@ Trả lời DUY NHẤT một đối tượng JSON hợp lệ theo đúng định
           "Authorization": `Bearer ${groqKey}`,
         },
         body: JSON.stringify({
-          model: "openai/gpt-oss-120b",
+          model: "llama3-70b-8192",
           messages: [
             { role: "system", content: system },
             { role: "user", content: `Từ cần tra: ${cleanWord}` },
@@ -207,6 +203,5 @@ Trả lời DUY NHẤT một đối tượng JSON hợp lệ theo đúng định
     }
   }
 
-  // Nếu lỡ Supabase không lưu được thì vẫn trả về kết quả AI cho client dùng tạm
   return res.status(200).json(aiResult);
 }
