@@ -243,6 +243,7 @@ function LolDictionary() {
         {lookupError && <div style={styles.errorRow}>⚠ <span style={{ color: "#c05621", fontSize: 13 }}>{lookupError}</span></div>}
       </section>
 
+      {/* Ô HIỂN THỊ KẾT QUẢ ĐÃ ĐƯỢC CHỈNH TRONG SUỐT VỪA VỪA */}
       {latestResult && (
         <section style={styles.latestResultCard}>
           <div style={styles.latestResultHeader}>
@@ -252,7 +253,7 @@ function LolDictionary() {
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginTop: '6px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '28px', fontWeight: '700', color: '#7b341e' }}>{latestResult.word}</span>
             <span style={{ fontSize: '15px', fontWeight: '600', color: '#dd6b20' }}>{latestResult.pinyin}</span>
-            <span style={{ fontSize: '12px', background: '#fffaf0', padding: '2px 8px', borderRadius: '10px', color: '#9c4221', border: '1px solid #feebc8' }}>📁 {latestResult.category}</span>
+            <span style={{ fontSize: '12px', background: 'rgba(255, 250, 240, 0.7)', padding: '2px 8px', borderRadius: '10px', color: '#9c4221', border: '1px solid #feebc8' }}>📁 {latestResult.category}</span>
           </div>
           <p style={{ fontSize: '15px', color: '#2d3748', margin: '8px 0 4px 0', fontWeight: '500' }}>{latestResult.meaning}</p>
           {latestResult.note && <p style={{ fontSize: '13px', color: '#718096', fontStyle: 'italic', margin: '4px 0 0 0' }}>Ghi chú: {latestResult.note}</p>}
@@ -459,7 +460,8 @@ const styles = {
   flashcardHeaderBtn: { display: "flex", alignItems: "center", gap: 6, background: "#d69e2e", color: "#fff", border: "none", borderRadius: 4, padding: "0 16px", fontWeight: 700, fontSize: 13.5, cursor: "pointer", boxShadow: "0 2px 8px rgba(214, 158, 46, 0.3)" },
   errorRow: { display: "flex", alignItems: "center", gap: 6, marginTop: 8 },
   
-  latestResultCard: { maxWidth: 640, margin: "0 auto 18px", background: "rgba(255, 253, 245, 0.95)", backdropFilter: "blur(8px)", border: "2px solid #dd6b20", borderRadius: 8, padding: "16px 18px", boxShadow: "0 4px 20px rgba(221, 107, 32, 0.15)" },
+  // Đã chỉnh độ trong suốt vừa phải (background độ đục khoảng 0.75 kèm hiệu ứng làm mờ nền phía sau)
+  latestResultCard: { maxWidth: 640, margin: "0 auto 18px", background: "rgba(255, 253, 245, 0.75)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", border: "2px solid rgba(221, 107, 32, 0.8)", borderRadius: 8, padding: "16px 18px", boxShadow: "0 4px 20px rgba(221, 107, 32, 0.15)" },
   latestResultHeader: { display: "flex", justifyContent: "space-between", alignItems: "center" },
   latestResultBadge: { fontSize: "11.5px", textTransform: "uppercase", fontWeight: "700", color: "#dd6b20", letterSpacing: "0.5px" },
   latestResultClose: { background: "transparent", border: "none", fontSize: "15px", color: "#718096", cursor: "pointer", fontWeight: "bold" },
