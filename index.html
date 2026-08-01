@@ -99,10 +99,8 @@ function LolDictionary() {
         throw new Error(data.error || "Lỗi tra cứu từ vựng");
       }
 
-      // Đưa kết quả vào ô trắng ngay dưới thanh tìm kiếm để bạn đọc nghĩa/pinyin trước
       setLatestResult(data);
       
-      // Đồng thời cập nhật danh sách tổng bên dưới
       setEntries(prev => {
         const filtered = prev.filter(e => e.id !== data.id && e.word !== data.word);
         return [data, ...filtered];
@@ -215,10 +213,10 @@ function LolDictionary() {
     <div style={styles.page}>
       <header style={styles.header}>
         <div style={styles.brandRow}>
-          <span style={{ fontSize: 22 }}>📖</span>
+          <span style={{ fontSize: 22 }}>🦊</span>
           <h1 style={styles.title}>TỪ ĐIỂN LIÊN MINH</h1>
         </div>
-        <p style={styles.subtitle}>Từ điển Hán ngữ · LIÊN MINH HUYỀN THOẠI</p>
+        <p style={styles.subtitle}>Từ điển Hán ngữ · PHONG CÁCH CÁO VÀNG</p>
       </header>
 
       <section style={styles.searchCard}>
@@ -244,20 +242,20 @@ function LolDictionary() {
             🎓 Ôn Flashcard
           </button>
         </div>
-        {lookupError && <div style={styles.errorRow}>⚠ <span style={{ color: "#d9534f", fontSize: 13 }}>{lookupError}</span></div>}
+        {lookupError && <div style={styles.errorRow}>⚠ <span style={{ color: "#c05621", fontSize: 13 }}>{lookupError}</span></div>}
       </section>
 
       {/* Ô TRẮNG HIỂN THỊ KẾT QUẢ TRA CỨU NGAY LẬP TỨC */}
       {latestResult && (
         <section style={styles.latestResultCard}>
           <div style={styles.latestResultHeader}>
-            <span style={styles.latestResultBadge}>✨ Từ mới tra cứu</span>
+            <span style={styles.latestResultBadge}>🦊 Từ mới tra cứu</span>
             <button onClick={() => setLatestResult(null)} style={styles.latestResultClose}>✕</button>
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginTop: '6px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '28px', fontWeight: '700', color: '#1a202c' }}>{latestResult.word}</span>
-            <span style={{ fontSize: '15px', fontWeight: '600', color: '#3182ce' }}>{latestResult.pinyin}</span>
-            <span style={{ fontSize: '12px', background: '#edf2f7', padding: '2px 8px', borderRadius: '10px', color: '#4a5568' }}>📁 {latestResult.category}</span>
+            <span style={{ fontSize: '28px', fontWeight: '700', color: '#7b341e' }}>{latestResult.word}</span>
+            <span style={{ fontSize: '15px', fontWeight: '600', color: '#dd6b20' }}>{latestResult.pinyin}</span>
+            <span style={{ fontSize: '12px', background: '#fffaf0', padding: '2px 8px', borderRadius: '10px', color: '#9c4221', border: '1px solid #feebc8' }}>📁 {latestResult.category}</span>
           </div>
           <p style={{ fontSize: '15px', color: '#2d3748', margin: '8px 0 4px 0', fontWeight: '500' }}>{latestResult.meaning}</p>
           {latestResult.note && <p style={{ fontSize: '13px', color: '#718096', fontStyle: 'italic', margin: '4px 0 0 0' }}>Ghi chú: {latestResult.note}</p>}
@@ -310,7 +308,7 @@ function LolDictionary() {
             <div key={category} style={styles.folder}>
               <div style={styles.folderHeader} onClick={() => toggleFolder(category)}>
                 <span style={styles.folderArrow}>{isClosed ? "▶" : "▼"}</span>
-                <span style={styles.folderName}>📁 {category}</span>
+                <span style={styles.folderName}>🦊 {category}</span>
                 <span style={styles.folderCount}>{items.length}</span>
               </div>
               {!isClosed && (
@@ -367,7 +365,7 @@ function LolDictionary() {
       {isFlashcardOpen && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalCard}>
-            <h3 style={{ margin: '0 0 16px 0', color: '#2d3748' }}>🎓 Ôn tập Flashcard</h3>
+            <h3 style={{ margin: '0 0 16px 0', color: '#7b341e' }}>🎓 Ôn tập Flashcard</h3>
             
             {entries.length === 0 ? (
               <p style={{ color: '#666' }}>Không có từ vựng để ôn tập!</p>
@@ -379,14 +377,14 @@ function LolDictionary() {
                 >
                   {!isFlipped ? (
                     <div>
-                      <span style={{ fontSize: '11.5px', textTransform: 'uppercase', color: '#718096', letterSpacing: '1px' }}>Từ vựng</span>
-                      <h2 style={{ margin: '8px 0 0 0', color: '#1a202c', fontSize: '30px' }}>{entries[currentIndex].word}</h2>
+                      <span style={{ fontSize: '11.5px', textTransform: 'uppercase', color: '#c05621', letterSpacing: '1px' }}>Từ vựng</span>
+                      <h2 style={{ margin: '8px 0 0 0', color: '#7b341e', fontSize: '30px' }}>{entries[currentIndex].word}</h2>
                       <span style={{ fontSize: '12.5px', color: '#a0aec0', marginTop: '12px', display: 'block' }}>(Bấm vào thẻ để lật xem nghĩa)</span>
                     </div>
                   ) : (
                     <div>
-                      <span style={{ fontSize: '11.5px', textTransform: 'uppercase', color: '#3182ce', letterSpacing: '1px' }}>Phiên âm & Nghĩa</span>
-                      <p style={{ fontSize: '19px', fontWeight: 'bold', color: '#2b6cb0', margin: '6px 0' }}>{entries[currentIndex].pinyin}</p>
+                      <span style={{ fontSize: '11.5px', textTransform: 'uppercase', color: '#dd6b20', letterSpacing: '1px' }}>Phiên âm & Nghĩa</span>
+                      <p style={{ fontSize: '19px', fontWeight: 'bold', color: '#c05621', margin: '6px 0' }}>{entries[currentIndex].pinyin}</p>
                       <p style={{ fontSize: '16px', color: '#2d3748', margin: '6px 0' }}>{entries[currentIndex].meaning}</p>
                       {entries[currentIndex].note && (
                         <p style={{ fontSize: '12.5px', color: '#e53e3e', fontStyle: 'italic', margin: '8px 0 0 0' }}>
@@ -404,7 +402,7 @@ function LolDictionary() {
                   >
                     ⬅ Trước
                   </button>
-                  <span style={{ fontSize: '13.5px', color: '#4a5568', fontWeight: '600' }}>
+                  <span style={{ fontSize: '13.5px', color: '#7b341e', fontWeight: '600' }}>
                     {currentIndex + 1} / {entries.length}
                   </span>
                   <button 
@@ -442,7 +440,7 @@ const styles = {
     letterSpacing: 1.2, 
     margin: 0, 
     textTransform: 'uppercase',
-    background: 'linear-gradient(135deg, #BF953F 0%, #FCF6BA 25%, #B38728 50%, #FBF5B7 75%, #AA771C 100%)',
+    background: 'linear-gradient(135deg, #DD6B20 0%, #F6AD55 50%, #9C4221 100%)',
     WebkitBackgroundClip: 'text',
     WebkitTextFillColor: 'transparent',
     filter: 'drop-shadow(0px 2px 3px rgba(0,0,0,0.6))',
@@ -453,58 +451,58 @@ const styles = {
     letterSpacing: 0.8, 
     marginTop: 6, 
     textTransform: 'uppercase',
-    background: 'linear-gradient(135deg, #BF953F 0%, #FCF6BA 25%, #B38728 50%, #FBF5B7 75%, #AA771C 100%)',
+    background: 'linear-gradient(135deg, #DD6B20 0%, #F6AD55 50%, #9C4221 100%)',
     WebkitBackgroundClip: 'text',
     WebkitTextFillColor: 'transparent',
     filter: 'drop-shadow(0px 1px 2px rgba(0,0,0,0.6))',
   },
-  searchCard: { maxWidth: 640, margin: "0 auto 18px", background: "rgba(255, 255, 255, 0.9)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.6)", borderRadius: 8, padding: 14, boxShadow: "0 4px 20px rgba(0, 0, 0, 0.08)" },
+  searchCard: { maxWidth: 640, margin: "0 auto 18px", background: "rgba(255, 253, 245, 0.92)", backdropFilter: "blur(8px)", border: "1px solid rgba(246, 173, 85, 0.6)", borderRadius: 8, padding: 14, boxShadow: "0 4px 20px rgba(156, 66, 33, 0.1)" },
   searchRow: { display: "flex", gap: 8, flexWrap: "wrap" },
-  searchInput: { flex: 1, minWidth: 160, background: "#fff", border: "1px solid #cbd5e0", borderRadius: 4, padding: "11px 12px", color: "#2d3748", fontSize: 15, fontFamily: "inherit", outline: "none" },
-  searchBtn: { display: "flex", alignItems: "center", gap: 6, background: "#3182ce", color: "#fff", border: "none", borderRadius: 4, padding: "0 16px", fontWeight: 700, fontSize: 13.5, cursor: "pointer", boxShadow: "0 2px 8px rgba(49, 130, 206, 0.3)" },
-  flashcardHeaderBtn: { display: "flex", alignItems: "center", gap: 6, background: "#38a169", color: "#fff", border: "none", borderRadius: 4, padding: "0 16px", fontWeight: 700, fontSize: 13.5, cursor: "pointer", boxShadow: "0 2px 8px rgba(56, 161, 105, 0.3)" },
+  searchInput: { flex: 1, minWidth: 160, background: "#fff", border: "1px solid #f6ad55", borderRadius: 4, padding: "11px 12px", color: "#2d3748", fontSize: 15, fontFamily: "inherit", outline: "none" },
+  searchBtn: { display: "flex", alignItems: "center", gap: 6, background: "#dd6b20", color: "#fff", border: "none", borderRadius: 4, padding: "0 16px", fontWeight: 700, fontSize: 13.5, cursor: "pointer", boxShadow: "0 2px 8px rgba(221, 107, 32, 0.3)" },
+  flashcardHeaderBtn: { display: "flex", alignItems: "center", gap: 6, background: "#d69e2e", color: "#fff", border: "none", borderRadius: 4, padding: "0 16px", fontWeight: 700, fontSize: 13.5, cursor: "pointer", boxShadow: "0 2px 8px rgba(214, 158, 46, 0.3)" },
   errorRow: { display: "flex", alignItems: "center", gap: 6, marginTop: 8 },
   
-  latestResultCard: { maxWidth: 640, margin: "0 auto 18px", background: "rgba(255, 255, 255, 0.95)", backdropFilter: "blur(8px)", border: "2px solid #3182ce", borderRadius: 8, padding: "16px 18px", boxShadow: "0 4px 20px rgba(49, 130, 206, 0.15)" },
+  latestResultCard: { maxWidth: 640, margin: "0 auto 18px", background: "rgba(255, 253, 245, 0.95)", backdropFilter: "blur(8px)", border: "2px solid #dd6b20", borderRadius: 8, padding: "16px 18px", boxShadow: "0 4px 20px rgba(221, 107, 32, 0.15)" },
   latestResultHeader: { display: "flex", justifyContent: "space-between", alignItems: "center" },
-  latestResultBadge: { fontSize: "11.5px", textTransform: "uppercase", fontWeight: "700", color: "#3182ce", letterSpacing: "0.5px" },
+  latestResultBadge: { fontSize: "11.5px", textTransform: "uppercase", fontWeight: "700", color: "#dd6b20", letterSpacing: "0.5px" },
   latestResultClose: { background: "transparent", border: "none", fontSize: "15px", color: "#718096", cursor: "pointer", fontWeight: "bold" },
 
   listHeader: { maxWidth: 640, margin: "0 auto 10px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 },
   listHeaderLeft: { display: "flex", alignItems: "center", gap: 6 },
-  listCount: { fontSize: 12.5, color: "#2d3748", fontWeight: 600, letterSpacing: 0.3, textShadow: "0 1px 2px rgba(255,255,255,0.8)" },
+  listCount: { fontSize: 12.5, color: "#fff", fontWeight: 700, letterSpacing: 0.3, textShadow: "0 1px 3px rgba(0,0,0,0.8)" },
   filterRow: { display: "flex", gap: 8 },
-  filterInput: { background: "rgba(255,255,255,0.9)", border: "1px solid #cbd5e0", borderRadius: 4, padding: "7px 10px", color: "#2d3748", fontSize: 13, fontFamily: "inherit", outline: "none", width: 160 },
-  addBtn: { display: "flex", alignItems: "center", gap: 5, background: "rgba(255,255,255,0.9)", border: "1px solid #cbd5e0", color: "#2b6cb0", borderRadius: 4, padding: "7px 12px", fontSize: 12.5, fontWeight: 600, cursor: "pointer" },
-  manualCard: { maxWidth: 640, margin: "0 auto 16px", background: "rgba(255, 255, 255, 0.95)", border: "1px solid #cbd5e0", borderRadius: 8, padding: 14, boxShadow: "0 4px 15px rgba(0, 0, 0, 0.1)" },
+  filterInput: { background: "rgba(255, 253, 245, 0.9)", border: "1px solid #f6ad55", borderRadius: 4, padding: "7px 10px", color: "#2d3748", fontSize: 13, fontFamily: "inherit", outline: "none", width: 160 },
+  addBtn: { display: "flex", alignItems: "center", gap: 5, background: "rgba(255, 253, 245, 0.9)", border: "1px solid #f6ad55", color: "#c05621", borderRadius: 4, padding: "7px 12px", fontSize: 12.5, fontWeight: 600, cursor: "pointer" },
+  manualCard: { maxWidth: 640, margin: "0 auto 16px", background: "rgba(255, 253, 245, 0.95)", border: "1px solid #f6ad55", borderRadius: 8, padding: 14, boxShadow: "0 4px 15px rgba(156, 66, 33, 0.15)" },
   manualGrid: { display: "flex", gap: 8 },
-  manualInput: { flex: 1, background: "#fff", border: "1px solid #cbd5e0", borderRadius: 4, padding: "9px 10px", color: "#2d3748", fontSize: 13.5, fontFamily: "inherit", outline: "none" },
-  saveBtn: { display: "flex", alignItems: "center", gap: 5, background: "#3182ce", color: "#fff", border: "none", borderRadius: 4, padding: "7px 14px", fontWeight: 700, fontSize: 12.5, cursor: "pointer" },
-  cancelBtn: { display: "flex", alignItems: "center", gap: 5, background: "transparent", color: "#4a5568", border: "1px solid #cbd5e0", borderRadius: 4, padding: "7px 14px", fontSize: 12.5, cursor: "pointer" },
+  manualInput: { flex: 1, background: "#fff", border: "1px solid #f6ad55", borderRadius: 4, padding: "9px 10px", color: "#2d3748", fontSize: 13.5, fontFamily: "inherit", outline: "none" },
+  saveBtn: { display: "flex", alignItems: "center", gap: 5, background: "#dd6b20", color: "#fff", border: "none", borderRadius: 4, padding: "7px 14px", fontWeight: 700, fontSize: 12.5, cursor: "pointer" },
+  cancelBtn: { display: "flex", alignItems: "center", gap: 5, background: "transparent", color: "#718096", border: "1px solid #cbd5e0", borderRadius: 4, padding: "7px 14px", fontSize: 12.5, cursor: "pointer" },
   list: { maxWidth: 640, margin: "0 auto", display: "flex", flexDirection: "column", gap: 14 },
-  folder: { border: "1px solid rgba(255,255,255,0.6)", borderRadius: 8, overflow: "hidden", background: "rgba(255, 255, 255, 0.8)", backdropFilter: "blur(5px)" },
-  folderHeader: { display: "flex", alignItems: "center", gap: 8, background: "rgba(255, 255, 255, 0.9)", padding: "10px 12px", cursor: "pointer", userSelect: "none" },
-  folderArrow: { fontSize: 10, color: "#3182ce" },
-  folderName: { fontSize: 14, fontWeight: 700, color: "#2b6cb0", flex: 1 },
-  folderCount: { fontSize: 11.5, color: "#4a5568", background: "rgba(237, 242, 247, 0.8)", padding: "2px 8px", borderRadius: 10 },
+  folder: { border: "1px solid rgba(246, 173, 85, 0.6)", borderRadius: 8, overflow: "hidden", background: "rgba(255, 253, 245, 0.85)", backdropFilter: "blur(5px)" },
+  folderHeader: { display: "flex", alignItems: "center", gap: 8, background: "rgba(255, 24af, 200, 0.3)", padding: "10px 12px", cursor: "pointer", userSelect: "none" },
+  folderArrow: { fontSize: 10, color: "#dd6b20" },
+  folderName: { fontSize: 14, fontWeight: 700, color: "#9c4221", flex: 1 },
+  folderCount: { fontSize: 11.5, color: "#7b341e", background: "rgba(254, 235, 200, 0.8)", padding: "2px 8px", borderRadius: 10 },
   folderBody: { display: "flex", flexDirection: "column", gap: 8, padding: 10 },
-  emptyState: { textAlign: "center", color: "#2d3748", fontWeight: 600, fontSize: 13.5, padding: "30px 10px", border: "1px dashed rgba(255,255,255,0.8)", borderRadius: 8, background: "rgba(255,255,255,0.7)", textShadow: "0 1px 2px rgba(255,255,255,0.8)" },
-  card: { background: "rgba(255, 255, 255, 0.92)", border: "1px solid #e2e8f0", borderLeft: "3px solid #3182ce", borderRadius: 6, padding: "13px 14px", boxShadow: "0 2px 10px rgba(0,0,0,0.04)" },
+  emptyState: { textAlign: "center", color: "#2d3748", fontWeight: 600, fontSize: 13.5, padding: "30px 10px", border: "1px dashed rgba(246, 173, 85, 0.8)", borderRadius: 8, background: "rgba(255, 253, 245, 0.8)", textShadow: "0 1px 2px rgba(255,255,255,0.8)" },
+  card: { background: "rgba(255, 255, 255, 0.95)", border: "1px solid #feebc8", borderLeft: "3px solid #dd6b20", borderRadius: 6, padding: "13px 14px", boxShadow: "0 2px 10px rgba(156,66,33,0.06)" },
   cardTop: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" },
-  word: { fontSize: 20, fontWeight: 700, marginRight: 10, color: "#1a202c" },
-  pinyin: { fontSize: 13.5, color: "#3182ce", fontWeight: 600 },
+  word: { fontSize: 20, fontWeight: 700, marginRight: 10, color: "#7b341e" },
+  pinyin: { fontSize: 13.5, color: "#dd6b20", fontWeight: 600 },
   meaning: { margin: "6px 0 2px", fontSize: 14.5, color: "#2d3748", lineHeight: 1.5 },
   note: { margin: "4px 0 0", fontSize: 12.5, color: "#718096", lineHeight: 1.4, fontStyle: "italic" },
-  inlineInput: { background: "#fff", border: "1px solid #cbd5e0", borderRadius: 4, padding: "5px 8px", color: "#2d3748", fontSize: 13, fontFamily: "inherit", outline: "none" },
+  inlineInput: { background: "#fff", border: "1px solid #f6ad55", borderRadius: 4, padding: "5px 8px", color: "#2d3748", fontSize: 13, fontFamily: "inherit", outline: "none" },
   iconBtn: { background: "transparent", border: "1px solid #cbd5e0", color: "#4a5568", borderRadius: 4, padding: "6px 9px", cursor: "pointer" },
-  iconBtnGood: { background: "#3182ce", border: "none", color: "#fff", borderRadius: 4, padding: "6px 9px", cursor: "pointer" },
+  iconBtnGood: { background: "#dd6b20", border: "none", color: "#fff", borderRadius: 4, padding: "6px 9px", cursor: "pointer" },
   iconBtnBad: { background: "transparent", border: "1px solid #e53e3e", color: "#e53e3e", borderRadius: 4, padding: "6px 9px", cursor: "pointer" },
   modalOverlay: { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 },
   modalCard: { background: 'white', padding: '24px', borderRadius: '12px', width: '420px', maxWidth: '90%', textAlign: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' },
-  flashcardBox: { border: '2px solid #e2e8f0', borderRadius: '10px', padding: '36px 20px', minHeight: '150px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', backgroundColor: '#f7fafc', margin: '10px 0 20px 0', userSelect: 'none' },
-  modalNavBtn: { padding: '6px 14px', background: '#edf2f7', color: '#333', border: '1px solid #cbd5e0', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 },
-  modalCloseBtn: { width: '100%', padding: '10px', background: '#e53e3e', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 700, cursor: 'pointer' },
-  toast: { position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)", background: "#3182ce", color: "#fff", padding: "9px 18px", borderRadius: 6, fontSize: 13, fontWeight: 600, boxShadow: "0 4px 20px rgba(49, 130, 206, 0.4)" },
+  flashcardBox: { border: '2px solid #feebc8', borderRadius: '10px', padding: '36px 20px', minHeight: '150px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', backgroundColor: '#fffaf0', margin: '10px 0 20px 0', userSelect: 'none' },
+  modalNavBtn: { padding: '6px 14px', background: '#feebc8', color: '#7b341e', border: '1px solid #f6ad55', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 },
+  modalCloseBtn: { width: '100%', padding: '10px', background: '#dd6b20', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 700, cursor: 'pointer' },
+  toast: { position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)", background: "#dd6b20", color: "#fff", padding: "9px 18px", borderRadius: 6, fontSize: 13, fontWeight: 600, boxShadow: "0 4px 20px rgba(221, 107, 32, 0.4)" },
 };
 
 ReactDOM.createRoot(document.getElementById("root")).render(<LolDictionary />);
