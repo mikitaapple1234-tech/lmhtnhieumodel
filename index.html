@@ -11,7 +11,7 @@
   body {
     margin: 0;
     overflow-x: hidden;
-    background-image: url('https://image.xportsnews.com/contents/images/upload/article/2024/0118/1705566127551816.jpg');
+    background-image: url('https://lh3.googleusercontent.com/d/1RlxX1Uvr1SF9ENf6PuH77biGTSF3JfU1');
     background-position: center;
     background-attachment: fixed;
     background-repeat: no-repeat;
@@ -41,7 +41,6 @@ function LolDictionary() {
   const [looking, setLooking] = useState(false);
   const [lookupError, setLookupError] = useState("");
   
-  // Ô trắng hiển thị kết quả tra cứu gần nhất ngay dưới thanh tìm kiếm
   const [latestResult, setLatestResult] = useState(null);
 
   const [editingId, setEditingId] = useState(null);
@@ -51,7 +50,6 @@ function LolDictionary() {
   const [toast, setToast] = useState("");
   const [closedFolders, setClosedFolders] = useState({});
 
-  // States Flashcard
   const [isFlashcardOpen, setIsFlashcardOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -245,7 +243,6 @@ function LolDictionary() {
         {lookupError && <div style={styles.errorRow}>⚠ <span style={{ color: "#c05621", fontSize: 13 }}>{lookupError}</span></div>}
       </section>
 
-      {/* Ô TRẮNG HIỂN THỊ KẾT QUẢ TRA CỨU NGAY LẬP TỨC */}
       {latestResult && (
         <section style={styles.latestResultCard}>
           <div style={styles.latestResultHeader}>
@@ -361,7 +358,6 @@ function LolDictionary() {
         })}
       </main>
 
-      {/* Modal Flashcard */}
       {isFlashcardOpen && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalCard}>
